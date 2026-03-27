@@ -11,27 +11,27 @@ const API_KEY_PROVIDERS = [
   {
     provider: "openai",
     label: "OpenAI",
-    description: "GPT models for script & metadata, DALL-E for images, Whisper for subtitles",
+    description: "스크립트·메타데이터용 GPT, 이미지용 DALL-E, 자막용 Whisper",
   },
   {
     provider: "claude",
     label: "Anthropic (Claude)",
-    description: "Claude models for script generation and metadata",
+    description: "스크립트·메타데이터 생성용 Claude",
   },
   {
     provider: "gemini",
     label: "Google Gemini",
-    description: "Gemini models for image generation",
+    description: "이미지 생성용 Gemini",
   },
   {
     provider: "elevenlabs",
     label: "ElevenLabs",
-    description: "High-quality text-to-speech voices",
+    description: "고품질 텍스트 음성 변환",
   },
   {
     provider: "pexels",
     label: "Pexels",
-    description: "Free stock photos and videos",
+    description: "무료 스톡 사진·영상",
   },
 ] as const;
 
@@ -64,24 +64,24 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-50">Settings</h1>
+        <h1 className="text-2xl font-semibold text-zinc-50">설정</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Manage your API keys and preferences.
+          API 키와 기본 설정을 관리하세요.
         </p>
       </div>
 
       <Tabs defaultValue="api-keys">
         <TabsList className="bg-zinc-900">
-          <TabsTrigger value="api-keys">API Keys</TabsTrigger>
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
+          <TabsTrigger value="api-keys">API 키</TabsTrigger>
+          <TabsTrigger value="preferences">환경 설정</TabsTrigger>
         </TabsList>
 
         <TabsContent value="api-keys" className="mt-4 space-y-4">
           <Card className="border-zinc-800 bg-zinc-900/50">
             <CardHeader>
-              <CardTitle className="text-zinc-50">API Keys</CardTitle>
+              <CardTitle className="text-zinc-50">API 키</CardTitle>
               <CardDescription className="text-zinc-400">
-                Add your API keys for AI services. Keys are encrypted with AES-256-GCM before storage.
+                AI 서비스 API 키를 추가하세요. 키는 AES-256-GCM으로 암호화되어 저장됩니다.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -108,14 +108,14 @@ export default function SettingsPage() {
         <TabsContent value="preferences" className="mt-4">
           <Card className="border-zinc-800 bg-zinc-900/50">
             <CardHeader>
-              <CardTitle className="text-zinc-50">Preferences</CardTitle>
+              <CardTitle className="text-zinc-50">환경 설정</CardTitle>
               <CardDescription className="text-zinc-400">
-                General settings for video generation.
+                영상 생성 기본 설정입니다.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-zinc-500">
-                Additional preferences will be available in a future update.
+                추가 설정은 향후 업데이트에서 제공될 예정입니다.
               </p>
             </CardContent>
           </Card>

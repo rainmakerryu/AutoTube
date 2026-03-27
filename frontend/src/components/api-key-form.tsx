@@ -45,7 +45,7 @@ export function ApiKeyForm({ provider, label, description, hasKey, onSaved }: Ap
       setOpen(false);
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save API key");
+      setError(err instanceof Error ? err.message : "API 키 저장에 실패했습니다");
     } finally {
       setIsSaving(false);
     }
@@ -58,7 +58,7 @@ export function ApiKeyForm({ provider, label, description, hasKey, onSaved }: Ap
       await apiClient(`/api/api-keys/${provider}`, { method: "DELETE" });
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete API key");
+      setError(err instanceof Error ? err.message : "API 키 삭제에 실패했습니다");
     } finally {
       setIsDeleting(false);
     }
@@ -93,19 +93,19 @@ export function ApiKeyForm({ provider, label, description, hasKey, onSaved }: Ap
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger render={<Button variant="outline" size="sm" />}>
-              {hasKey ? "Update" : "Add Key"}
+              {hasKey ? "수정" : "키 추가"}
           </DialogTrigger>
           <DialogContent className="bg-zinc-950 border-zinc-800">
             <DialogHeader>
-              <DialogTitle className="text-zinc-50">{label} API Key</DialogTitle>
+              <DialogTitle className="text-zinc-50">{label} API 키</DialogTitle>
               <DialogDescription className="text-zinc-400">
-                {description}. Your key is encrypted before storage.
+                {description}. 키는 암호화되어 저장됩니다.
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor={`key-${provider}`}>API Key</Label>
+                <Label htmlFor={`key-${provider}`}>API 키</Label>
                 <div className="relative">
                   <Input
                     id={`key-${provider}`}
@@ -129,11 +129,11 @@ export function ApiKeyForm({ provider, label, description, hasKey, onSaved }: Ap
 
             <DialogFooter>
               <Button variant="ghost" onClick={() => setOpen(false)}>
-                Cancel
+                취소
               </Button>
               <Button onClick={handleSave} disabled={isSaving || !apiKey.trim()}>
                 <Save className="mr-2 h-4 w-4" />
-                {isSaving ? "Saving..." : "Save Key"}
+                {isSaving ? "저장 중..." : "키 저장"}
               </Button>
             </DialogFooter>
           </DialogContent>

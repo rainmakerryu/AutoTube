@@ -25,6 +25,19 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "bg-yellow-900 text-yellow-300",
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  draft: "초안",
+  running: "진행 중",
+  completed: "완료",
+  failed: "실패",
+  cancelled: "취소됨",
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  shorts: "Shorts",
+  longform: "Long-form",
+};
+
 interface PipelineStep {
   name: string;
   status: string;
@@ -81,7 +94,7 @@ export default function ProjectDetailPage() {
         const data = await apiClient(`/api/pipeline/${projectId}/status`);
         setPipelineStatus(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load project");
+        setError(err instanceof Error ? err.message : "프로젝트를 불러오지 못했습니다");
       } finally {
         setIsLoading(false);
       }
@@ -97,7 +110,7 @@ export default function ProjectDetailPage() {
       const data = await apiClient(`/api/pipeline/${projectId}/status`);
       setPipelineStatus(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start pipeline");
+      setError(err instanceof Error ? err.message : "파이프라인 시작에 실패했습니다");
     } finally {
       setIsStarting(false);
     }
@@ -111,7 +124,7 @@ export default function ProjectDetailPage() {
       const data = await apiClient(`/api/pipeline/${projectId}/status`);
       setPipelineStatus(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to cancel pipeline");
+      setError(err instanceof Error ? err.message : "파이프라인 취소에 실패했습니다");
     } finally {
       setIsCancelling(false);
     }
@@ -125,14 +138,14 @@ export default function ProjectDetailPage() {
         <Link href="/dashboard">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+            뒤로
           </Button>
         </Link>
         <Card className="border-red-900/50 bg-zinc-900/50">
           <CardContent className="py-8 text-center">
             <p className="text-red-400">{error}</p>
             <Button variant="ghost" className="mt-4" onClick={() => router.refresh()}>
-              Retry
+              다시 시도
             </Button>
           </CardContent>
         </Card>
@@ -158,12 +171,12 @@ export default function ProjectDetailPage() {
                 {project?.title ?? "Project"}
               </h1>
               <Badge className={STATUS_COLORS[project?.status ?? "draft"]}>
-                {project?.status ?? "draft"}
+                {STATUS_LABELS[project?.status ?? "draft"] ?? project?.status}
               </Badge>
             </div>
             <p className="mt-1 text-sm text-zinc-400">
-              {project?.type === "shorts" ? "Shorts" : "Long-form"} &middot; Created{" "}
-              {project ? new Date(project.created_at).toLocaleDateString() : ""}
+              {TYPE_LABELS[project?.type ?? ""] ?? project?.type} &middot; 생성일{" "}
+              {project ? new Date(project.created_at).toLocaleDateString("ko-KR") : ""}
             </p>
           </div>
         </div>
@@ -172,19 +185,19 @@ export default function ProjectDetailPage() {
           {!isRunning && project?.status !== "completed" && (
             <Button onClick={handleStart} disabled={isStarting}>
               <Play className="mr-2 h-4 w-4" />
-              {isStarting ? "Starting..." : "Start Pipeline"}
+              {isStarting ? "시작 중..." : "파이프라인 시작"}
             </Button>
           )}
           {isRunning && (
             <Button variant="destructive" onClick={handleCancel} disabled={isCancelling}>
               <Square className="mr-2 h-4 w-4" />
-              {isCancelling ? "Cancelling..." : "Cancel"}
+              {isCancelling ? "취소 중..." : "취소"}
             </Button>
           )}
           {project?.status === "completed" && (
             <Button variant="outline">
               <Download className="mr-2 h-4 w-4" />
-              Download
+              다운로드
             </Button>
           )}
         </div>
@@ -205,11 +218,11 @@ export default function ProjectDetailPage() {
       {project?.status === "completed" && (
         <Card className="border-zinc-800 bg-zinc-900/50">
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-zinc-400">Output</CardTitle>
+            <CardTitle className="text-sm font-medium text-zinc-400">출력물</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-zinc-500">
-              Video and assets will appear here once available.
+              영상과 에셋이 준비되면 여기에 표시됩니다.
             </p>
           </CardContent>
         </Card>
@@ -217,7 +230,7 @@ export default function ProjectDetailPage() {
 
       <Card className="border-zinc-800 bg-zinc-900/50">
         <CardHeader>
-          <CardTitle className="text-sm font-medium text-zinc-400">Configuration</CardTitle>
+          <CardTitle className="text-sm font-medium text-zinc-400">설정 정보</CardTitle>
         </CardHeader>
         <CardContent>
           <pre className="overflow-auto rounded-lg bg-zinc-950 p-4 text-xs text-zinc-400">

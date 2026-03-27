@@ -18,24 +18,24 @@ const VIDEO_TYPES = [
   {
     value: "shorts",
     label: "Shorts",
-    description: "60s vertical video for YouTube Shorts",
+    description: "60초 세로 숏폼 영상",
     icon: Film,
   },
   {
     value: "longform",
     label: "Long-form",
-    description: "5-15 min horizontal video",
+    description: "5-15분 가로 영상",
     icon: Video,
   },
 ] as const;
 
 const PIPELINE_STEPS = [
-  { key: "script", label: "Script", icon: FileText, description: "AI-generated script from your topic" },
-  { key: "tts", label: "TTS", icon: Mic, description: "Text-to-speech audio generation" },
-  { key: "images", label: "Images", icon: Image, description: "AI-generated or stock visuals" },
-  { key: "video", label: "Video", icon: Video, description: "Compose scenes with Ken Burns effects" },
-  { key: "subtitle", label: "Subtitle", icon: Subtitles, description: "Auto-generated captions (Whisper)" },
-  { key: "metadata", label: "Metadata", icon: FileText, description: "AI title, description, and tags" },
+  { key: "script", label: "스크립트", icon: FileText, description: "주제를 기반으로 AI 스크립트 생성" },
+  { key: "tts", label: "TTS", icon: Mic, description: "텍스트를 음성으로 변환" },
+  { key: "images", label: "이미지", icon: Image, description: "AI 생성 또는 스톡 이미지" },
+  { key: "video", label: "영상", icon: Video, description: "켄 번즈 효과로 장면 합성" },
+  { key: "subtitle", label: "자막", icon: Subtitles, description: "Whisper 자동 자막 생성" },
+  { key: "metadata", label: "메타데이터", icon: FileText, description: "AI 제목·설명·태그 생성" },
 ] as const;
 
 const STEP_LABELS = ["영상 타입", "제목/주제", "파이프라인", "최종 확인"] as const;
@@ -110,8 +110,8 @@ function StepType({ formData, onChange }: { formData: FormData; onChange: (data:
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-medium text-zinc-50">Choose video type</h2>
-        <p className="text-sm text-zinc-400">Select the format for your video.</p>
+        <h2 className="text-lg font-medium text-zinc-50">영상 타입 선택</h2>
+        <p className="text-sm text-zinc-400">만들 영상의 형식을 선택하세요.</p>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {VIDEO_TYPES.map((vt) => {
@@ -145,30 +145,30 @@ function StepTopic({ formData, onChange }: { formData: FormData; onChange: (data
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-medium text-zinc-50">Describe your video</h2>
-        <p className="text-sm text-zinc-400">Give your project a title and topic.</p>
+        <h2 className="text-lg font-medium text-zinc-50">영상 내용 입력</h2>
+        <p className="text-sm text-zinc-400">프로젝트 제목과 주제를 입력하세요.</p>
       </div>
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="title">Title</Label>
+          <Label htmlFor="title">제목</Label>
           <Input
             id="title"
-            placeholder="My Awesome Video"
+            placeholder="내 영상 제목"
             value={formData.title}
             onChange={(e) => onChange({ title: e.target.value })}
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="topic">Topic / Prompt</Label>
+          <Label htmlFor="topic">주제 / 프롬프트</Label>
           <Textarea
             id="topic"
-            placeholder="Explain quantum computing in simple terms for beginners..."
+            placeholder="초보자를 위한 양자컴퓨팅 쉬운 설명..."
             rows={4}
             value={formData.topic}
             onChange={(e) => onChange({ topic: e.target.value })}
           />
           <p className="text-xs text-zinc-500">
-            Describe what the video should be about. The AI will generate a script from this.
+            영상 내용을 설명하세요. AI가 이를 바탕으로 스크립트를 생성합니다.
           </p>
         </div>
       </div>
@@ -186,8 +186,8 @@ function StepPipeline({ formData, onChange }: { formData: FormData; onChange: (d
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-medium text-zinc-50">Pipeline steps</h2>
-        <p className="text-sm text-zinc-400">Toggle which steps to include in generation.</p>
+        <h2 className="text-lg font-medium text-zinc-50">파이프라인 단계</h2>
+        <p className="text-sm text-zinc-400">생성에 포함할 단계를 선택하세요.</p>
       </div>
       <div className="space-y-3">
         {PIPELINE_STEPS.map((step) => {
@@ -227,30 +227,30 @@ function StepConfirm({ formData }: { formData: FormData }) {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-medium text-zinc-50">Confirm & Create</h2>
-        <p className="text-sm text-zinc-400">Review your project settings before starting.</p>
+        <h2 className="text-lg font-medium text-zinc-50">확인 및 생성</h2>
+        <p className="text-sm text-zinc-400">시작 전 설정을 검토하세요.</p>
       </div>
       <Card className="border-zinc-800 bg-zinc-900/50">
         <CardContent className="space-y-4 pt-6">
           <div className="flex justify-between">
-            <span className="text-sm text-zinc-400">Type</span>
+            <span className="text-sm text-zinc-400">타입</span>
             <Badge variant="outline" className="border-zinc-700 text-zinc-300">
               {typeLabel}
             </Badge>
           </div>
           <div className="flex justify-between">
-            <span className="text-sm text-zinc-400">Title</span>
-            <span className="text-sm font-medium text-zinc-200">{formData.title || "(untitled)"}</span>
+            <span className="text-sm text-zinc-400">제목</span>
+            <span className="text-sm font-medium text-zinc-200">{formData.title || "(제목 없음)"}</span>
           </div>
           <div>
-            <span className="text-sm text-zinc-400">Topic</span>
-            <p className="mt-1 text-sm text-zinc-300">{formData.topic || "(no topic)"}</p>
+            <span className="text-sm text-zinc-400">주제</span>
+            <p className="mt-1 text-sm text-zinc-300">{formData.topic || "(주제 없음)"}</p>
           </div>
           <div>
-            <span className="text-sm text-zinc-400">Pipeline</span>
+            <span className="text-sm text-zinc-400">파이프라인</span>
             <div className="mt-2 flex flex-wrap gap-2">
               {enabledSteps.map((s) => (
-                <Badge key={s.key} className="bg-blue-900 text-blue-300">
+                <Badge key={s.key} className="bg-violet-900 text-violet-300">
                   {s.label}
                 </Badge>
               ))}
@@ -302,7 +302,7 @@ function NewProjectInner() {
       });
       router.push(`/projects/${project.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create project");
+      setError(err instanceof Error ? err.message : "프로젝트 생성에 실패했습니다");
     } finally {
       setIsSubmitting(false);
     }
@@ -339,17 +339,17 @@ function NewProjectInner() {
           disabled={isSubmitting}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          {step === 0 ? "Cancel" : "Back"}
+          {step === 0 ? "취소" : "이전"}
         </Button>
 
         {step < TOTAL_STEPS - 1 ? (
           <Button onClick={() => setStep(step + 1)} disabled={!canProceed}>
-            Next
+            다음
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         ) : (
           <Button onClick={handleCreate} disabled={isSubmitting || !canProceed}>
-            {isSubmitting ? "Creating..." : "Create Project"}
+            {isSubmitting ? "생성 중..." : "프로젝트 생성"}
             <Check className="ml-2 h-4 w-4" />
           </Button>
         )}

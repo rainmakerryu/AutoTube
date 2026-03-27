@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AutoTube - YouTube Video Automation",
-  description: "AI-powered YouTube video generation platform",
+  title: "AutoTube - 유튜브 영상 자동화",
+  description: "AI 기반 유튜브 영상 자동 생성 플랫폼",
 };
 
 export default function RootLayout({
@@ -28,7 +28,7 @@ export default function RootLayout({
   return (
     <ClerkProvider appearance={{ baseTheme: dark }}>
       <html
-        lang="en"
+        lang="ko"
         className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
       >
         <body className="min-h-full flex flex-col">

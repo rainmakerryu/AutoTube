@@ -15,9 +15,9 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/projects/new", label: "New Video", icon: Plus },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard", label: "대시보드", icon: LayoutDashboard },
+  { href: "/projects/new", label: "새 영상", icon: Plus },
+  { href: "/settings", label: "설정", icon: Settings },
 ] as const;
 
 function NavLinks({ onClick }: { onClick?: () => void }) {
@@ -67,7 +67,7 @@ export default function DashboardLayout({
           <Separator className="mb-4 bg-zinc-800" />
           <div className="flex items-center gap-3 px-3">
             <UserButton signInUrl="/login" />
-            <span className="text-sm text-zinc-400">Account</span>
+            <span className="text-sm text-zinc-400">계정</span>
           </div>
         </div>
       </aside>

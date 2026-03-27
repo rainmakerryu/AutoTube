@@ -16,12 +16,20 @@ import { Badge } from "@/components/ui/badge";
 import type { PipelineEvent } from "@/hooks/use-pipeline-sse";
 
 const STEP_CONFIG: Record<string, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
-  script: { label: "Script", icon: FileText },
+  script: { label: "스크립트", icon: FileText },
   tts: { label: "TTS", icon: Mic },
-  images: { label: "Images", icon: Image },
-  video: { label: "Video", icon: Video },
-  subtitle: { label: "Subtitle", icon: Subtitles },
-  metadata: { label: "Metadata", icon: FileText },
+  images: { label: "이미지", icon: Image },
+  video: { label: "영상", icon: Video },
+  subtitle: { label: "자막", icon: Subtitles },
+  metadata: { label: "메타데이터", icon: FileText },
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "대기 중",
+  running: "진행 중",
+  completed: "완료",
+  failed: "실패",
+  skipped: "건너뜀",
 };
 
 const STATUS_DISPLAY: Record<string, { color: string; badgeClass: string }> = {
@@ -85,7 +93,7 @@ export function PipelineProgress({ steps, events = [], isConnected }: PipelinePr
   return (
     <Card className="border-zinc-800 bg-zinc-900/50">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-zinc-400">Pipeline Progress</CardTitle>
+        <CardTitle className="text-sm font-medium text-zinc-400">파이프라인 진행 상황</CardTitle>
         <div className="flex items-center gap-2">
           {isConnected !== undefined && (
             <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-green-500" : "bg-zinc-600"}`} />
@@ -118,7 +126,7 @@ export function PipelineProgress({ steps, events = [], isConnected }: PipelinePr
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-zinc-200">{config.label}</span>
-                    <Badge className={display.badgeClass}>{step.status}</Badge>
+                    <Badge className={display.badgeClass}>{STATUS_LABELS[step.status] ?? step.status}</Badge>
                   </div>
                   {step.message && (
                     <p className="mt-1 text-xs text-zinc-500">{step.message}</p>
