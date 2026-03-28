@@ -13,13 +13,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PipelineProgress } from "@/components/pipeline-progress";
-import { usePipelineSSE } from "@/hooks/use-pipeline-sse";
+import { PipelineWizard } from "@/components/pipeline-wizard";
 import { apiClient } from "@/lib/api";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-zinc-700 text-zinc-300",
   running: "bg-blue-900 text-blue-300",
+  reviewing: "bg-violet-900 text-violet-300",
   completed: "bg-green-900 text-green-300",
   failed: "bg-red-900 text-red-300",
   cancelled: "bg-yellow-900 text-yellow-300",
@@ -28,6 +28,7 @@ const STATUS_COLORS: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
   draft: "초안",
   running: "진행 중",
+  reviewing: "검토 중",
   completed: "완료",
   failed: "실패",
   cancelled: "취소됨",
@@ -38,26 +39,22 @@ const TYPE_LABELS: Record<string, string> = {
   longform: "Long-form",
 };
 
-interface PipelineStep {
-  name: string;
+interface StepInfo {
+  step: string;
   status: string;
-  progress: number;
-  message?: string;
+  provider?: string | null;
+  error_message?: string | null;
 }
 
 interface Project {
   id: number;
   title: string;
   type: string;
+  topic: string;
   status: string;
-  config: Record<string, unknown>;
+  pipeline_config: Record<string, unknown>;
   created_at: string;
   updated_at: string;
-}
-
-interface PipelineStatus {
-  project: Project;
-  steps: PipelineStep[];
 }
 
 function ProjectSkeleton() {
@@ -75,31 +72,34 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const projectId = params.id as string;
 
-  const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null);
+  const [project, setProject] = useState<Project | null>(null);
+  const [pipelineSteps, setPipelineSteps] = useState<StepInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
 
-  const isRunning = pipelineStatus?.project.status === "running";
-
-  const { events, isConnected } = usePipelineSSE({
-    projectId,
-    enabled: isRunning,
-  });
+  const isPipelineActive = pipelineSteps.length > 0 && project?.status !== "draft";
 
   useEffect(() => {
-    async function fetchStatus() {
+    async function fetchData() {
       try {
-        const data = await apiClient(`/api/pipeline/${projectId}/status`);
-        setPipelineStatus(data);
+        // 프로젝트 정보와 파이프라인 상태를 함께 조회
+        const [projectData, pipelineData] = await Promise.all([
+          apiClient(`/api/projects/${projectId}`),
+          apiClient(`/api/pipeline/${projectId}/status`).catch(() => null),
+        ]);
+        setProject(projectData);
+        if (pipelineData?.steps) {
+          setPipelineSteps(pipelineData.steps);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "프로젝트를 불러오지 못했습니다");
       } finally {
         setIsLoading(false);
       }
     }
-    fetchStatus();
+    fetchData();
   }, [projectId]);
 
   async function handleStart() {
@@ -107,8 +107,10 @@ export default function ProjectDetailPage() {
     setError(null);
     try {
       await apiClient(`/api/pipeline/${projectId}/start`, { method: "POST" });
-      const data = await apiClient(`/api/pipeline/${projectId}/status`);
-      setPipelineStatus(data);
+      // 파이프라인 시작 후 상태 갱신
+      const pipelineData = await apiClient(`/api/pipeline/${projectId}/status`);
+      setPipelineSteps(pipelineData.steps ?? []);
+      setProject((prev) => prev ? { ...prev, status: "running" } : prev);
     } catch (err) {
       setError(err instanceof Error ? err.message : "파이프라인 시작에 실패했습니다");
     } finally {
@@ -121,8 +123,9 @@ export default function ProjectDetailPage() {
     setError(null);
     try {
       await apiClient(`/api/pipeline/${projectId}/cancel`, { method: "POST" });
-      const data = await apiClient(`/api/pipeline/${projectId}/status`);
-      setPipelineStatus(data);
+      const pipelineData = await apiClient(`/api/pipeline/${projectId}/status`);
+      setPipelineSteps(pipelineData.steps ?? []);
+      setProject((prev) => prev ? { ...prev, status: "cancelled" } : prev);
     } catch (err) {
       setError(err instanceof Error ? err.message : "파이프라인 취소에 실패했습니다");
     } finally {
@@ -132,7 +135,7 @@ export default function ProjectDetailPage() {
 
   if (isLoading) return <ProjectSkeleton />;
 
-  if (error && !pipelineStatus) {
+  if (error && !project) {
     return (
       <div className="space-y-4">
         <Link href="/dashboard">
@@ -152,9 +155,6 @@ export default function ProjectDetailPage() {
       </div>
     );
   }
-
-  const project = pipelineStatus?.project;
-  const steps = pipelineStatus?.steps ?? [];
 
   return (
     <div className="space-y-6">
@@ -182,13 +182,13 @@ export default function ProjectDetailPage() {
         </div>
 
         <div className="flex gap-2">
-          {!isRunning && project?.status !== "completed" && (
+          {!isPipelineActive && project?.status !== "completed" && (
             <Button onClick={handleStart} disabled={isStarting}>
               <Play className="mr-2 h-4 w-4" />
               {isStarting ? "시작 중..." : "파이프라인 시작"}
             </Button>
           )}
-          {isRunning && (
+          {isPipelineActive && project?.status !== "completed" && project?.status !== "cancelled" && (
             <Button variant="destructive" onClick={handleCancel} disabled={isCancelling}>
               <Square className="mr-2 h-4 w-4" />
               {isCancelling ? "취소 중..." : "취소"}
@@ -207,11 +207,10 @@ export default function ProjectDetailPage() {
         <p className="text-sm text-red-400">{error}</p>
       )}
 
-      {steps.length > 0 && (
-        <PipelineProgress
-          steps={steps}
-          events={events}
-          isConnected={isConnected}
+      {isPipelineActive && (
+        <PipelineWizard
+          projectId={projectId}
+          initialSteps={pipelineSteps}
         />
       )}
 
@@ -234,7 +233,7 @@ export default function ProjectDetailPage() {
         </CardHeader>
         <CardContent>
           <pre className="overflow-auto rounded-lg bg-zinc-950 p-4 text-xs text-zinc-400">
-            {JSON.stringify(project?.config ?? {}, null, 2)}
+            {JSON.stringify(project?.pipeline_config ?? {}, null, 2)}
           </pre>
         </CardContent>
       </Card>
