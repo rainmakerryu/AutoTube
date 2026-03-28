@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Film, Mic, Image, Video, Subtitles, FileText, ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { Film, Mic, Image, Video, Subtitles, FileText, ArrowLeft, ArrowRight, Check, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -294,10 +294,8 @@ function NewProjectInner() {
         body: JSON.stringify({
           title: formData.title,
           type: formData.type,
-          config: {
-            topic: formData.topic,
-            steps: formData.steps,
-          },
+          topic: formData.topic,
+          pipeline_config: formData.steps,
         }),
       });
       router.push(`/projects/${project.id}`);
@@ -329,7 +327,28 @@ function NewProjectInner() {
       </Card>
 
       {error && (
-        <p className="text-sm text-red-400">{error}</p>
+        <div className={`rounded-lg p-4 flex gap-3 ${
+            error.includes("한도") 
+            ? "bg-indigo-950/40 border border-indigo-500/50" 
+            : "bg-red-950/20 border border-red-500/30"
+        }`}>
+          <AlertCircle className={`h-5 w-5 shrink-0 ${error.includes("한도") ? "text-indigo-400" : "text-red-400"}`} />
+          <div className="flex-1 space-y-2">
+            <p className={`text-sm ${error.includes("한도") ? "text-indigo-200 font-medium" : "text-red-200"}`}>
+                {error}
+            </p>
+            {error.includes("한도") && (
+                <Button 
+                    size="sm" 
+                    variant="link" 
+                    className="h-auto p-0 text-indigo-400 font-bold hover:text-indigo-300"
+                    onClick={() => router.push("/pricing")}
+                >
+                    껌값으로 무제한 생성하기 →
+                </Button>
+            )}
+          </div>
+        </div>
       )}
 
       <div className="flex justify-between">

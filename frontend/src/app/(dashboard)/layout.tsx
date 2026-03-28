@@ -11,6 +11,8 @@ import {
   Film,
   LogOut,
   User,
+  CreditCard,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -19,6 +21,7 @@ import { Separator } from "@/components/ui/separator";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "대시보드", icon: LayoutDashboard },
   { href: "/projects/new", label: "새 영상", icon: Plus },
+  { href: "/pricing", label: "가격 안내", icon: CreditCard },
   { href: "/settings", label: "설정", icon: Settings },
 ] as const;
 
@@ -51,19 +54,35 @@ function NavLinks({ onClick }: { onClick?: () => void }) {
 }
 
 function UserMenu() {
-  const { user, signOut } = useAuth();
+  const { user, plan, signOut } = useAuth();
   if (!user) return null;
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3 px-3 py-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 border border-zinc-700">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 border border-zinc-700 relative">
            <User className="h-4 w-4 text-zinc-400" />
+           {plan === "pro" && (
+             <div className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 border border-zinc-950">
+               <Zap className="h-2.5 w-2.5 text-white fill-white" />
+             </div>
+           )}
         </div>
         <div className="flex flex-col">
-          <span className="text-xs font-medium text-zinc-200 truncate max-w-[140px]">
-            {user.email?.split("@")[0]}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-zinc-200 truncate max-w-[100px]">
+                {user.email?.split("@")[0]}
+            </span>
+            {plan === "pro" ? (
+                <span className="rounded bg-indigo-500/20 px-1 py-0.5 text-[8px] font-bold text-indigo-400 border border-indigo-500/30 uppercase tracking-tighter">
+                   Pro
+                </span>
+            ) : (
+                <span className="rounded bg-zinc-800 px-1 py-0.5 text-[8px] font-bold text-zinc-500 border border-zinc-700 uppercase tracking-tighter">
+                   Free
+                </span>
+            )}
+          </div>
           <span className="text-[10px] text-zinc-500 truncate max-w-[140px]">
             {user.email}
           </span>
