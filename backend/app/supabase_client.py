@@ -2,6 +2,13 @@ from supabase import create_client, Client
 from app.config import settings
 
 def get_supabase_client() -> Client:
-    if not settings.supabase_url or not settings.supabase_anon_key:
-        raise ValueError("SUPABASE_URL or SUPABASE_ANON_KEY not set")
-    return create_client(settings.supabase_url, settings.supabase_anon_key)
+    """
+    Returns a Supabase client using service_role key.
+    The service_role key bypasses RLS for server-side operations.
+    """
+    url = settings.supabase_url
+    # Prefer service_role key for backend ops to bypass RLS
+    key = settings.supabase_service_role_key or settings.supabase_anon_key
+    if not url or not key:
+        raise ValueError("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set")
+    return create_client(url, key)
