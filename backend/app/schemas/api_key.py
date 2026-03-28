@@ -1,9 +1,11 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ApiKeyCreate(BaseModel):
     provider: str
-    key: str
+    key: str = Field(alias="api_key")
+
+    model_config = {"populate_by_name": True}
 
 
 class ApiKeyResponse(BaseModel):
