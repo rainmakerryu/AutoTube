@@ -106,3 +106,43 @@ def test_build_metadata_api_request_claude():
 def test_build_metadata_api_request_invalid():
     with pytest.raises(ValueError, match="지원하지 않는"):
         build_metadata_api_request("prompt", "invalid", "key")
+
+
+def test_build_metadata_api_request_deepseek():
+    req = build_metadata_api_request(
+        prompt="test prompt",
+        provider="deepseek",
+        api_key="ds-test-key",
+    )
+    assert req["url"] == "https://api.deepseek.com/chat/completions"
+    assert "Bearer ds-test-key" in req["headers"]["Authorization"]
+    assert req["json"]["model"] == "deepseek-chat"
+    assert req["json"]["messages"][0]["content"] == "test prompt"
+
+
+def test_build_metadata_api_request_ollama_default_url():
+    req = build_metadata_api_request(
+        prompt="test prompt",
+        provider="ollama",
+        api_key="",
+    )
+    assert "localhost:11434" in req["url"]
+    assert req["json"]["model"] == "llama3"
+
+
+def test_build_metadata_api_request_ollama_custom_url():
+    req = build_metadata_api_request(
+        prompt="test prompt",
+        provider="ollama",
+        api_key="http://custom-host:11434",
+    )
+    assert "custom-host:11434" in req["url"]
+
+
+def test_extract_text_openai_compatible_providers():
+    from app.workers.metadata import extract_text_from_response, OPENAI_COMPATIBLE_PROVIDERS
+
+    response = {"choices": [{"message": {"content": "metadata result"}}]}
+    for provider in OPENAI_COMPATIBLE_PROVIDERS:
+        result = extract_text_from_response(provider, response)
+        assert result == "metadata result"

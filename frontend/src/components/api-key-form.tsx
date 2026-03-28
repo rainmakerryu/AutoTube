@@ -22,9 +22,21 @@ interface ApiKeyFormProps {
   description: string;
   hasKey: boolean;
   onSaved: () => void;
+  free?: boolean;
+  noKeyRequired?: boolean;
+  placeholder?: string;
 }
 
-export function ApiKeyForm({ provider, label, description, hasKey, onSaved }: ApiKeyFormProps) {
+export function ApiKeyForm({
+  provider,
+  label,
+  description,
+  hasKey,
+  onSaved,
+  free,
+  noKeyRequired,
+  placeholder = "sk-...",
+}: ApiKeyFormProps) {
   const [open, setOpen] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
@@ -69,7 +81,14 @@ export function ApiKeyForm({ provider, label, description, hasKey, onSaved }: Ap
       <div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-zinc-200">{label}</span>
-          {hasKey ? (
+          {free && (
+            <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400">
+              무료
+            </span>
+          )}
+          {noKeyRequired ? (
+            <span className="h-2 w-2 rounded-full bg-emerald-500" title="API 키 불필요 — 바로 사용 가능" />
+          ) : hasKey ? (
             <span className="h-2 w-2 rounded-full bg-green-500" />
           ) : (
             <span className="h-2 w-2 rounded-full bg-zinc-600" />
@@ -79,6 +98,12 @@ export function ApiKeyForm({ provider, label, description, hasKey, onSaved }: Ap
       </div>
 
       <div className="flex gap-2">
+        {noKeyRequired ? (
+          <span className="rounded-md bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400">
+            활성화됨
+          </span>
+        ) : (
+          <>
         {hasKey && (
           <Button
             variant="ghost"
@@ -110,7 +135,7 @@ export function ApiKeyForm({ provider, label, description, hasKey, onSaved }: Ap
                   <Input
                     id={`key-${provider}`}
                     type={showKey ? "text" : "password"}
-                    placeholder="sk-..."
+                    placeholder={placeholder}
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     className="pr-10"
@@ -138,6 +163,8 @@ export function ApiKeyForm({ provider, label, description, hasKey, onSaved }: Ap
             </DialogFooter>
           </DialogContent>
         </Dialog>
+          </>
+        )}
       </div>
     </div>
   );

@@ -9,7 +9,10 @@ from app.services.encryption import EncryptionService
 
 router = APIRouter(prefix="/api/settings/api-keys", tags=["api-keys"])
 
-VALID_PROVIDERS = {"openai", "claude", "elevenlabs", "gemini", "pexels", "youtube"}
+VALID_PROVIDERS = {
+    "openai", "claude", "elevenlabs", "gemini", "pexels", "youtube",
+    "deepseek", "ollama", "edgetts", "comfyui",
+}
 
 
 @router.post("", status_code=201, response_model=ApiKeyResponse)

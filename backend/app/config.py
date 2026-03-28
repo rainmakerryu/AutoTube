@@ -9,7 +9,9 @@ class Settings(BaseSettings):
     r2_secret_key: str = ""
     r2_bucket: str = "autotube"
     encryption_master_key: str = ""
-    clerk_secret_key: str = ""
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
+    supabase_jwt_secret: str = ""
     cors_origins: list[str] = ["http://localhost:3000"]
 
     model_config = {"env_file": ".env"}

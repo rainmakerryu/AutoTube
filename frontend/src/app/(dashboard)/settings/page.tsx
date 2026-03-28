@@ -33,6 +33,33 @@ const API_KEY_PROVIDERS = [
     label: "Pexels",
     description: "무료 스톡 사진·영상",
   },
+  {
+    provider: "deepseek",
+    label: "DeepSeek",
+    description: "무료/저가 스크립트·메타데이터 생성 (OpenAI 호환)",
+    free: true,
+  },
+  {
+    provider: "ollama",
+    label: "Ollama (로컬 LLM)",
+    description: "로컬 실행 LLM — API 비용 없음. URL만 입력",
+    free: true,
+    placeholder: "http://localhost:11434",
+  },
+  {
+    provider: "edgetts",
+    label: "Edge TTS (무료)",
+    description: "Microsoft 무료 음성 합성 — API 키 불필요",
+    free: true,
+    noKeyRequired: true,
+  },
+  {
+    provider: "comfyui",
+    label: "ComfyUI (로컬 이미지 생성)",
+    description: "SDXL + IP-Adapter 로컬 이미지 생성 — API 비용 없음. URL만 입력",
+    free: true,
+    placeholder: "http://127.0.0.1:8188",
+  },
 ] as const;
 
 interface ApiKeyInfo {
@@ -86,7 +113,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {isLoading ? (
-                Array.from({ length: 5 }, (_, i) => (
+                Array.from({ length: 9 }, (_, i) => (
                   <Skeleton key={i} className="h-16 w-full bg-zinc-800" />
                 ))
               ) : (
@@ -98,6 +125,9 @@ export default function SettingsPage() {
                     description={p.description}
                     hasKey={savedProviders.has(p.provider)}
                     onSaved={fetchKeys}
+                    free={"free" in p && p.free}
+                    noKeyRequired={"noKeyRequired" in p && p.noKeyRequired}
+                    placeholder={"placeholder" in p ? p.placeholder : undefined}
                   />
                 ))
               )}

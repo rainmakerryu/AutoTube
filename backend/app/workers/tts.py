@@ -1,9 +1,26 @@
+import asyncio
+
 import httpx
 
 from app.celery_app import celery_app
 
+try:
+    import edge_tts
+
+    EDGE_TTS_AVAILABLE = True
+except ImportError:
+    edge_tts = None  # type: ignore[assignment]
+    EDGE_TTS_AVAILABLE = False
+
 ELEVENLABS_DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"
 OPENAI_DEFAULT_VOICE = "alloy"
+EDGE_TTS_DEFAULT_VOICE = "ko-KR-SunHiNeural"
+EDGE_TTS_VOICES: dict[str, str] = {
+    "ko": "ko-KR-SunHiNeural",
+    "en": "en-US-AriaNeural",
+    "ja": "ja-JP-NanamiNeural",
+    "zh": "zh-CN-XiaoxiaoNeural",
+}
 MAX_TTS_CHUNK_LENGTH = 4000
 API_TIMEOUT_SECONDS = 120.0
 
@@ -45,10 +62,12 @@ def build_tts_request(
                 "response_format": "mp3",
             },
         }
+    elif provider == "edgetts":
+        return None  # Edge TTS는 HTTP API가 아닌 로컬 라이브러리 → 별도 처리
     else:
         raise ValueError(
             f"지원하지 않는 TTS provider입니다: {provider}. "
-            "'elevenlabs' 또는 'openai'를 사용하세요."
+            "'elevenlabs', 'openai' 또는 'edgetts'를 사용하세요."
         )
 
 
@@ -77,19 +96,49 @@ def split_text_for_tts(text: str) -> list[str]:
     return chunks
 
 
+def _generate_edge_tts(text: str, voice: str) -> bytes:
+    """Run edge-tts in a synchronous context via asyncio."""
+    if not EDGE_TTS_AVAILABLE:
+        raise ValueError(
+            "edge-tts 패키지가 설치되지 않았습니다. "
+            "'pip install edge-tts'로 설치하세요."
+        )
+
+    async def _run() -> bytes:
+        communicate = edge_tts.Communicate(text, voice)
+        audio_chunks: list[bytes] = []
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio_chunks.append(chunk["data"])
+        return b"".join(audio_chunks)
+
+    return asyncio.run(_run())
+
+
 @celery_app.task(name="pipeline.generate_tts")
 def generate_tts_task(
     project_id: int,
     text: str,
     provider: str,
-    api_key: str,
+    api_key: str | None = None,
     voice_id: str | None = None,
 ) -> dict:
+    # Edge TTS: 로컬 라이브러리 직접 호출 (API 키 불필요)
+    if provider == "edgetts":
+        voice = voice_id or EDGE_TTS_DEFAULT_VOICE
+        audio_data = _generate_edge_tts(text, voice)
+        return {
+            "audio_size": len(audio_data),
+            "chunk_count": 1,
+            "provider": "edgetts",
+        }
+
+    # 유료 TTS: HTTP API 호출
     chunks = split_text_for_tts(text)
     audio_parts: list[bytes] = []
 
     for chunk in chunks:
-        request = build_tts_request(chunk, provider, api_key, voice_id)
+        request = build_tts_request(chunk, provider, api_key or "", voice_id)
         response = httpx.post(
             request["url"],
             headers=request["headers"],

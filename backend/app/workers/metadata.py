@@ -109,16 +109,42 @@ def build_metadata_api_request(prompt: str, provider: str, api_key: str) -> dict
                 "messages": [{"role": "user", "content": prompt}],
             },
         }
+    elif provider == "deepseek":
+        return {
+            "url": "https://api.deepseek.com/chat/completions",
+            "headers": {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            "json": {
+                "model": "deepseek-chat",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 2000,
+            },
+        }
+    elif provider == "ollama":
+        base_url = api_key or "http://localhost:11434"
+        return {
+            "url": f"{base_url}/v1/chat/completions",
+            "headers": {"Content-Type": "application/json"},
+            "json": {
+                "model": "llama3",
+                "messages": [{"role": "user", "content": prompt}],
+            },
+        }
     else:
         raise ValueError(
             f"지원하지 않는 메타데이터 API provider입니다: {provider}. "
-            "'openai' 또는 'claude'를 사용하세요."
+            "'openai', 'claude', 'deepseek' 또는 'ollama'를 사용하세요."
         )
+
+
+OPENAI_COMPATIBLE_PROVIDERS = {"openai", "deepseek", "ollama"}
 
 
 def extract_text_from_response(provider: str, response_json: dict) -> str:
     """Extract text content from API response."""
-    if provider == "openai":
+    if provider in OPENAI_COMPATIBLE_PROVIDERS:
         return response_json["choices"][0]["message"]["content"]
     elif provider == "claude":
         return response_json["content"][0]["text"]

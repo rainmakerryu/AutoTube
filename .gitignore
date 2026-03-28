@@ -1,0 +1,3 @@
+.autotube.pids
+*.log
+.playwright-mcp/

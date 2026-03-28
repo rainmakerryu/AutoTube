@@ -1,6 +1,9 @@
+import base64
+
 import httpx
 
 from app.celery_app import celery_app
+from app.workers.comfyui_client import COMFYUI_DEFAULT_URL
 
 SHORTS_IMAGE_SIZE = "1024x1792"
 LONGFORM_IMAGE_SIZE = "1792x1024"
@@ -10,6 +13,12 @@ MAX_IMAGES_PER_PROJECT = 30
 PEXELS_PER_PAGE = 1
 GEMINI_MODEL = "gemini-2.0-flash-exp"
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+
+CONSISTENCY_PROMPT_PREFIX = (
+    "Maintain consistent visual style throughout all images. "
+    "Use the same art style, color palette, lighting, and character appearance. "
+)
+CONSISTENCY_STYLE_REFERENCE = "Match the established style: {style}. "
 
 
 def extract_visual_keywords(scene: dict) -> str:
@@ -28,6 +37,28 @@ def extract_visual_keywords(scene: dict) -> str:
     if narration:
         return f"{visual} {narration}"
     return visual
+
+
+def build_consistent_prompts(scenes: list[dict]) -> list[str]:
+    """Build prompts with style consistency instructions.
+
+    First scene sets the style reference. Subsequent scenes include
+    the reference to maintain visual coherence across the video.
+    """
+    prompts: list[str] = []
+    style_description = ""
+
+    for i, scene in enumerate(scenes):
+        keywords = extract_visual_keywords(scene)
+        if i == 0:
+            style_description = keywords
+            prompt = f"{CONSISTENCY_PROMPT_PREFIX}Style reference: {keywords}"
+        else:
+            style_ref = CONSISTENCY_STYLE_REFERENCE.format(style=style_description)
+            prompt = f"{CONSISTENCY_PROMPT_PREFIX}{style_ref}Scene: {keywords}"
+        prompts.append(prompt)
+
+    return prompts
 
 
 def build_image_generation_request(
@@ -95,10 +126,13 @@ def build_image_generation_request(
                 "per_page": PEXELS_PER_PAGE,
             },
         }
+    elif provider == "comfyui":
+        # Sentinel — ComfyUI uses async workflow submission, handled separately
+        return {"method": "COMFYUI"}
     else:
         raise ValueError(
             f"지원하지 않는 이미지 provider입니다: {provider}. "
-            "'gemini', 'openai' 또는 'pexels'를 사용하세요."
+            "'gemini', 'openai', 'pexels' 또는 'comfyui'를 사용하세요."
         )
 
 
@@ -124,27 +158,108 @@ def parse_image_response(provider: str, response_json: dict) -> str | None:
         if not photos:
             return None
         return photos[0].get("src", {}).get(PEXELS_IMAGE_SIZE)
+    elif provider == "comfyui":
+        # ComfyUI responses are handled by comfyui_client, not this function
+        return None
     else:
         raise ValueError(
             f"지원하지 않는 이미지 provider입니다: {provider}. "
-            "'gemini', 'openai' 또는 'pexels'를 사용하세요."
+            "'gemini', 'openai', 'pexels' 또는 'comfyui'를 사용하세요."
         )
 
 
-@celery_app.task(name="pipeline.generate_images")
-def generate_images_task(
-    project_id: int,
-    scenes: list[dict],
+def _parse_comfyui_dimensions(video_type: str) -> tuple[int, int]:
+    """Convert video type to (width, height) for ComfyUI."""
+    size_str = SHORTS_IMAGE_SIZE if video_type == "shorts" else LONGFORM_IMAGE_SIZE
+    w, h = size_str.split("x")
+    return int(w), int(h)
+
+
+def _extract_output_filename(outputs: dict) -> str | None:
+    """Extract the first output image filename from ComfyUI history outputs."""
+    for _node_id, node_output in outputs.items():
+        images = node_output.get("images", [])
+        if images:
+            return images[0].get("filename")
+    return None
+
+
+def _generate_comfyui_images(
+    prompts: list[str],
+    base_url: str,
+    video_type: str,
+) -> list[str | None]:
+    """Generate images via ComfyUI with IP-Adapter style consistency.
+
+    First scene: text-only SDXL generation.
+    Subsequent scenes: IP-Adapter with first scene as style reference.
+    Returns list of base64-encoded image data (same format as Gemini provider).
+    """
+    from app.workers.comfyui_client import (
+        ComfyUIError,
+        check_comfyui_health,
+        download_comfyui_image,
+        poll_comfyui_result,
+        submit_workflow,
+        upload_reference_image,
+    )
+    from app.workers.comfyui_workflow import (
+        build_ipadapter_workflow,
+        build_txt2img_workflow,
+    )
+
+    url = base_url or COMFYUI_DEFAULT_URL
+
+    if not check_comfyui_health(url):
+        raise ComfyUIError(
+            f"ComfyUI 서버에 연결할 수 없습니다: {url}. "
+            "ComfyUI가 실행 중인지 확인하세요."
+        )
+
+    width, height = _parse_comfyui_dimensions(video_type)
+    image_urls: list[str | None] = []
+    reference_filename: str | None = None
+
+    for i, prompt in enumerate(prompts):
+        if i == 0 or reference_filename is None:
+            workflow = build_txt2img_workflow(prompt, width, height, seed=i)
+        else:
+            workflow = build_ipadapter_workflow(
+                prompt, reference_filename, width, height, seed=i,
+            )
+
+        prompt_id = submit_workflow(url, workflow)
+        outputs = poll_comfyui_result(url, prompt_id)
+
+        output_filename = _extract_output_filename(outputs)
+        if output_filename is None:
+            image_urls.append(None)
+            continue
+
+        image_bytes = download_comfyui_image(url, output_filename)
+
+        # First scene: upload as IP-Adapter reference for subsequent scenes
+        if i == 0:
+            reference_filename = upload_reference_image(
+                url, image_bytes, "autotube_ref_scene_0.png",
+            )
+
+        b64 = base64.b64encode(image_bytes).decode()
+        image_urls.append(b64)
+
+    return image_urls
+
+
+def _generate_standard_images(
+    prompts: list[str],
     provider: str,
     api_key: str,
-    video_type: str = "shorts",
-) -> dict:
-    """Generate images for each scene. Returns dict with image_urls list and metadata."""
-    limited_scenes = scenes[:MAX_IMAGES_PER_PROJECT]
+    video_type: str,
+) -> list[str | None]:
+    """Generate images via standard HTTP API providers (Gemini, OpenAI, Pexels)."""
     image_urls: list[str | None] = []
 
-    for scene in limited_scenes:
-        prompt = extract_visual_keywords(scene)
+    for prompt in prompts:
         request = build_image_generation_request(prompt, provider, api_key, video_type)
 
         method = request["method"]
@@ -166,6 +281,26 @@ def generate_images_task(
 
         image_url = parse_image_response(provider, response.json())
         image_urls.append(image_url)
+
+    return image_urls
+
+
+@celery_app.task(name="pipeline.generate_images")
+def generate_images_task(
+    project_id: int,
+    scenes: list[dict],
+    provider: str,
+    api_key: str,
+    video_type: str = "shorts",
+) -> dict:
+    """Generate images for each scene. Returns dict with image_urls list and metadata."""
+    limited_scenes = scenes[:MAX_IMAGES_PER_PROJECT]
+    prompts = build_consistent_prompts(limited_scenes)
+
+    if provider == "comfyui":
+        image_urls = _generate_comfyui_images(prompts, api_key, video_type)
+    else:
+        image_urls = _generate_standard_images(prompts, provider, api_key, video_type)
 
     return {
         "image_urls": image_urls,

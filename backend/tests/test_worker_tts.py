@@ -75,3 +75,32 @@ def test_split_text_for_tts_long():
     assert len(chunks) > 1
     for chunk in chunks:
         assert len(chunk) <= MAX_TTS_CHUNK_LENGTH
+
+
+def test_build_tts_request_edgetts_returns_none():
+    from app.workers.tts import build_tts_request
+
+    result = build_tts_request(
+        text="안녕하세요",
+        provider="edgetts",
+        api_key="",
+    )
+    assert result is None
+
+
+def test_edge_tts_voices_contains_supported_languages():
+    from app.workers.tts import EDGE_TTS_VOICES, EDGE_TTS_DEFAULT_VOICE
+
+    assert "ko" in EDGE_TTS_VOICES
+    assert "en" in EDGE_TTS_VOICES
+    assert EDGE_TTS_DEFAULT_VOICE == EDGE_TTS_VOICES["ko"]
+
+
+def test_generate_edge_tts_raises_when_unavailable():
+    import pytest
+    from unittest.mock import patch
+    from app.workers.tts import _generate_edge_tts
+
+    with patch("app.workers.tts.EDGE_TTS_AVAILABLE", False):
+        with pytest.raises(ValueError, match="edge-tts 패키지가 설치되지 않았습니다"):
+            _generate_edge_tts("안녕하세요", "ko-KR-SunHiNeural")

@@ -76,3 +76,57 @@ def test_build_api_request_invalid_provider():
 
     with pytest.raises(ValueError, match="지원하지 않는"):
         build_api_request("prompt", "invalid", "key")
+
+
+def test_build_api_request_deepseek():
+    from app.workers.script import build_api_request
+
+    req = build_api_request(
+        prompt="test prompt",
+        provider="deepseek",
+        api_key="ds-test-key",
+    )
+    assert req["url"] == "https://api.deepseek.com/chat/completions"
+    assert "Bearer ds-test-key" in req["headers"]["Authorization"]
+    assert req["json"]["model"] == "deepseek-chat"
+    assert req["json"]["messages"][0]["content"] == "test prompt"
+
+
+def test_build_api_request_ollama_default_url():
+    from app.workers.script import build_api_request
+
+    req = build_api_request(
+        prompt="test prompt",
+        provider="ollama",
+        api_key="",
+    )
+    assert "localhost:11434" in req["url"]
+    assert req["json"]["model"] == "llama3"
+
+
+def test_build_api_request_ollama_custom_url():
+    from app.workers.script import build_api_request
+
+    req = build_api_request(
+        prompt="test prompt",
+        provider="ollama",
+        api_key="http://my-server:11434",
+    )
+    assert "my-server:11434" in req["url"]
+
+
+def test_extract_text_openai_compatible_providers():
+    from app.workers.script import extract_text_from_response, OPENAI_COMPATIBLE_PROVIDERS
+
+    response = {"choices": [{"message": {"content": "generated text"}}]}
+    for provider in OPENAI_COMPATIBLE_PROVIDERS:
+        result = extract_text_from_response(provider, response)
+        assert result == "generated text"
+
+
+def test_extract_text_claude():
+    from app.workers.script import extract_text_from_response
+
+    response = {"content": [{"text": "claude response"}]}
+    result = extract_text_from_response("claude", response)
+    assert result == "claude response"
