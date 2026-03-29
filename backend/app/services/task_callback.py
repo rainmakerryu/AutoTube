@@ -58,20 +58,26 @@ def on_step_complete(result: dict, project_id: int, step: str) -> None:
             ).filter("id", "eq", project_id).execute()
 
 
-@celery_app.task(name="pipeline.on_step_failed", ignore_result=True)
-def on_step_failed(request, exc, traceback, project_id: int, step: str) -> None:
+@celery_app.task(name="pipeline.on_step_failed", bind=True, ignore_result=True)
+def on_step_failed(self, failed_task_id: str, project_id: int, step: str) -> None:
     """Celery 태스크 실패 콜백. link_error= 로 연결된다.
 
+    Celery link_error 콜백은 실패한 태스크의 ID를 첫 번째 인자로 받는다.
+    bind=True이므로 self가 추가된다.
+
     Args:
-        request: Celery request 객체 (자동 전달).
-        exc: 발생한 예외.
-        traceback: 트레이스백.
+        failed_task_id: 실패한 태스크의 Celery task ID.
         project_id: 프로젝트 ID.
         step: 파이프라인 단계 이름.
     """
     supabase = get_supabase_client()
 
-    error_message = str(exc) if exc else "알 수 없는 오류가 발생했습니다."
+    # 실패한 태스크의 결과에서 에러 메시지를 가져온다.
+    result = self.app.AsyncResult(failed_task_id)
+    try:
+        error_message = str(result.result) if result.result else "알 수 없는 오류가 발생했습니다."
+    except Exception:
+        error_message = "알 수 없는 오류가 발생했습니다."
 
     supabase.table("pipeline_steps").update(
         {
