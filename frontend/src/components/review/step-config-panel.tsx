@@ -221,7 +221,7 @@ export function StepConfigPanel({ step, onRun, isLoading }: StepConfigPanelProps
         {keysLoaded && needsApiKey && !hasApiKey && (
           <div className="p-3 rounded-lg bg-yellow-950/50 border border-yellow-900/50 text-sm text-yellow-300">
             <strong>{currentProvider?.name ?? selectedProvider}</strong> API 키가 등록되지 않았습니다.
-            <a href="/dashboard/settings" className="underline ml-1">설정 페이지</a>에서 API 키를 먼저 등록해 주세요.
+            <a href="/settings" className="underline ml-1">설정 페이지</a>에서 API 키를 먼저 등록해 주세요.
           </div>
         )}
 
