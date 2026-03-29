@@ -235,6 +235,22 @@ async def run_step(
             detail=f"이 단계에서 사용할 수 없는 프로바이더입니다: {body.provider}. 허용: {', '.join(allowed)}",
         )
 
+    # API 키가 필요한 프로바이더인지 확인 (무료/로컬 프로바이더 제외)
+    FREE_PROVIDERS = {"edgetts", "ollama", "comfyui"}
+    if body.provider and body.provider not in FREE_PROVIDERS:
+        key_res = (
+            supabase.table("api_keys")
+            .select("id")
+            .filter("user_id", "eq", user_id)
+            .filter("provider", "eq", body.provider)
+            .execute()
+        )
+        if not key_res.data:
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{body.provider}' API 키가 등록되지 않았습니다. 설정 페이지에서 API 키를 먼저 등록해 주세요.",
+            )
+
     task_id = dispatch_step(
         project_id=project_id,
         step=step,

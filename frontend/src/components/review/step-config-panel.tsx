@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { apiClient } from "@/lib/api";
 
 interface ProviderOption {
   id: string;
@@ -66,13 +67,44 @@ interface StepConfigPanelProps {
   isLoading?: boolean;
 }
 
+// API 키가 필요 없는 무료/로컬 프로바이더
+const FREE_PROVIDERS = new Set(["edgetts", "ollama", "comfyui"]);
+
 export function StepConfigPanel({ step, onRun, isLoading }: StepConfigPanelProps) {
   const providers = STEP_PROVIDERS[step] ?? [];
   const [selectedProvider, setSelectedProvider] = useState(providers[0]?.id ?? "");
   const [selectedModel, setSelectedModel] = useState(providers[0]?.models[0] ?? "");
   const [selectedVoice, setSelectedVoice] = useState<string>("");
+  const [registeredProviders, setRegisteredProviders] = useState<Set<string>>(new Set());
+  const [keysLoaded, setKeysLoaded] = useState(false);
+
+  // 등록된 API 키 목록 조회
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const keys = await apiClient("/api/api-keys");
+        if (!cancelled) {
+          const providerSet = new Set<string>(
+            (keys as Array<{ provider: string }>).map((k) => k.provider)
+          );
+          setRegisteredProviders(providerSet);
+        }
+      } catch {
+        // 조회 실패 시 빈 Set 유지 — 백엔드에서 최종 검증
+      } finally {
+        if (!cancelled) setKeysLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const currentProvider = providers.find((p) => p.id === selectedProvider);
+
+  // 선택된 프로바이더의 API 키 등록 여부
+  const needsApiKey = !FREE_PROVIDERS.has(selectedProvider);
+  const hasApiKey = registeredProviders.has(selectedProvider);
+  const canRun = !needsApiKey || hasApiKey;
 
   const handleProviderChange = (value: string | null) => {
     if (!value) return;
@@ -124,18 +156,28 @@ export function StepConfigPanel({ step, onRun, isLoading }: StepConfigPanelProps
               <SelectValue placeholder="프로바이더 선택" />
             </SelectTrigger>
             <SelectContent>
-              {providers.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  <span className="flex items-center gap-2">
-                    {p.name}
-                    {p.free && (
-                      <Badge variant="secondary" className="bg-emerald-900/60 text-emerald-300 text-[10px] px-1.5 py-0">
-                        무료
-                      </Badge>
-                    )}
-                  </span>
-                </SelectItem>
-              ))}
+              {providers.map((p) => {
+                const isFree = FREE_PROVIDERS.has(p.id);
+                const keyRegistered = registeredProviders.has(p.id);
+                const available = isFree || keyRegistered;
+                return (
+                  <SelectItem key={p.id} value={p.id}>
+                    <span className="flex items-center gap-2">
+                      <span className={available ? "" : "text-zinc-500"}>{p.name}</span>
+                      {p.free && (
+                        <Badge variant="secondary" className="bg-emerald-900/60 text-emerald-300 text-[10px] px-1.5 py-0">
+                          무료
+                        </Badge>
+                      )}
+                      {!isFree && !keyRegistered && keysLoaded && (
+                        <Badge variant="secondary" className="bg-yellow-900/60 text-yellow-300 text-[10px] px-1.5 py-0">
+                          키 미등록
+                        </Badge>
+                      )}
+                    </span>
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
@@ -176,8 +218,15 @@ export function StepConfigPanel({ step, onRun, isLoading }: StepConfigPanelProps
           </div>
         )}
 
-        <Button onClick={handleRun} disabled={isLoading || !selectedProvider} className="w-full">
-          {isLoading ? "생성 중..." : "생성 시작"}
+        {keysLoaded && needsApiKey && !hasApiKey && (
+          <div className="p-3 rounded-lg bg-yellow-950/50 border border-yellow-900/50 text-sm text-yellow-300">
+            <strong>{currentProvider?.name ?? selectedProvider}</strong> API 키가 등록되지 않았습니다.
+            <a href="/dashboard/settings" className="underline ml-1">설정 페이지</a>에서 API 키를 먼저 등록해 주세요.
+          </div>
+        )}
+
+        <Button onClick={handleRun} disabled={isLoading || !selectedProvider || !canRun} className="w-full">
+          {isLoading ? "생성 중..." : canRun ? "생성 시작" : "API 키 필요"}
         </Button>
       </CardContent>
     </Card>
