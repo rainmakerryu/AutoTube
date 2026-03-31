@@ -24,10 +24,16 @@ class ComfyUIError(Exception):
     """Raised when ComfyUI returns an error or is unreachable."""
 
 
+def _normalize_url(url: str) -> str:
+    """Remove trailing slashes from base URL to prevent double-slash issues."""
+    return url.rstrip("/")
+
+
 def check_comfyui_health(base_url: str = COMFYUI_DEFAULT_URL) -> bool:
     """Ping ComfyUI server. Returns True if reachable."""
+    url = _normalize_url(base_url)
     try:
-        response = httpx.get(f"{base_url}/system_stats", timeout=HEALTH_TIMEOUT)
+        response = httpx.get(f"{url}/system_stats", timeout=HEALTH_TIMEOUT)
         return response.status_code == 200
     except httpx.HTTPError:
         return False
@@ -39,6 +45,7 @@ def submit_workflow(base_url: str, workflow: dict) -> str:
     Returns the prompt_id for polling.
     Raises ComfyUIError if submission fails.
     """
+    base_url = _normalize_url(base_url)
     try:
         response = httpx.post(
             f"{base_url}/prompt",
@@ -77,6 +84,7 @@ def poll_comfyui_result(
     Returns the output dict for the prompt_id.
     Raises ComfyUIError on timeout or execution error.
     """
+    base_url = _normalize_url(base_url)
     start = time.monotonic()
     interval = POLL_INITIAL_INTERVAL
 
@@ -114,6 +122,10 @@ def poll_comfyui_result(
         if outputs:
             return outputs
 
+        # 성공했지만 출력이 비어있는 경우 (캐시 등) — 빈 결과 반환
+        if status.get("completed") or status.get("status_str") == "success":
+            return outputs or {}
+
         time.sleep(interval)
         interval = min(interval * 2, POLL_MAX_INTERVAL)
 
@@ -135,6 +147,7 @@ def download_comfyui_image(
     Returns raw image bytes.
     Raises ComfyUIError if download fails.
     """
+    base_url = _normalize_url(base_url)
     params = {"filename": filename, "type": img_type}
     if subfolder:
         params["subfolder"] = subfolder
@@ -164,6 +177,7 @@ def upload_reference_image(
     Returns the filename as stored by ComfyUI.
     Raises ComfyUIError if upload fails.
     """
+    base_url = _normalize_url(base_url)
     try:
         response = httpx.post(
             f"{base_url}/upload/image",

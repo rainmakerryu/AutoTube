@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import asyncio
+import os
 
 import httpx
 
 from app.celery_app import celery_app
+from app.services.storage import StorageService, build_storage_key
 
 try:
     import edge_tts
@@ -23,6 +27,28 @@ EDGE_TTS_VOICES: dict[str, str] = {
 }
 MAX_TTS_CHUNK_LENGTH = 4000
 API_TIMEOUT_SECONDS = 120.0
+AUDIO_FILENAME = "audio.mp3"
+AUDIO_CONTENT_TYPE = "audio/mpeg"
+
+
+def _get_storage() -> StorageService | None:
+    """R2 스토리지 서비스를 환경변수에서 초기화. 설정 없으면 None."""
+    endpoint = os.environ.get("R2_ENDPOINT")
+    access_key = os.environ.get("R2_ACCESS_KEY")
+    secret_key = os.environ.get("R2_SECRET_KEY")
+    bucket = os.environ.get("R2_BUCKET")
+    if not all([endpoint, access_key, secret_key, bucket]):
+        return None
+    return StorageService(endpoint, access_key, secret_key, bucket)
+
+
+def _upload_audio(project_id: int, audio_data: bytes) -> str | None:
+    """오디오를 R2에 업로드하고 URL을 반환. R2 미설정 시 None."""
+    storage = _get_storage()
+    if storage is None:
+        return None
+    key = build_storage_key(project_id, "tts", AUDIO_FILENAME)
+    return storage.upload_file(key, audio_data, AUDIO_CONTENT_TYPE)
 
 
 def build_tts_request(
@@ -127,7 +153,9 @@ def generate_tts_task(
     if provider == "edgetts":
         voice = voice_id or EDGE_TTS_DEFAULT_VOICE
         audio_data = _generate_edge_tts(text, voice)
+        audio_url = _upload_audio(project_id, audio_data)
         return {
+            "audio_url": audio_url,
             "audio_size": len(audio_data),
             "chunk_count": 1,
             "provider": "edgetts",
@@ -149,8 +177,10 @@ def generate_tts_task(
         audio_parts.append(response.content)
 
     combined_audio = b"".join(audio_parts)
+    audio_url = _upload_audio(project_id, combined_audio)
 
     return {
+        "audio_url": audio_url,
         "audio_size": len(combined_audio),
         "chunk_count": len(chunks),
         "provider": provider,

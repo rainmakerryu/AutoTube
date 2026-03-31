@@ -236,7 +236,7 @@ async def run_step(
         )
 
     # API 키가 필요한 프로바이더인지 확인 (무료/로컬 프로바이더 제외)
-    FREE_PROVIDERS = {"edgetts", "ollama", "comfyui"}
+    FREE_PROVIDERS = {"edgetts", "ollama", "comfyui", "script"}
     if body.provider and body.provider not in FREE_PROVIDERS:
         key_res = (
             supabase.table("api_keys")

@@ -12,7 +12,7 @@ STEP_PROVIDERS: dict[str, list[str]] = {
     "tts":      ["elevenlabs", "openai", "edgetts"],
     "images":   ["gemini", "openai", "pexels", "comfyui"],
     "video":    [],
-    "subtitle": ["openai"],
+    "subtitle": ["openai", "script"],
     "metadata": ["openai", "claude", "deepseek", "ollama"],
 }
 

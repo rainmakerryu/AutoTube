@@ -20,14 +20,28 @@ def build_script_prompt(topic: str, video_type: str, language: str = "ko") -> st
 장면 수: {scene_count}개
 언어: {language}
 
-다음 형식으로 스크립트를 작성하세요:
-[장면 N]: (화면 설명)
-나레이션: (읽을 내용)
+반드시 아래 형식을 정확히 따르세요. 다른 형식은 절대 사용하지 마세요:
+
+[장면 1]: (이 장면에서 화면에 보여줄 이미지/영상 설명)
+나레이션: (이 장면에서 읽을 대사)
+
+[장면 2]: (화면 설명)
+나레이션: (대사)
+
+예시:
+[장면 1]: 귀여운 고양이가 노트북 키보드 위에 앉아있는 모습
+나레이션: 여러분, 고양이가 왜 키보드 위를 좋아하는지 아시나요?
+
+[장면 2]: 고양이가 높은 곳에서 아래를 내려다보는 장엄한 모습
+나레이션: 그건 바로 고양이의 지배 본능 때문입니다!
 
 주의사항:
+- 반드시 [장면 N]: 으로 시작하세요
+- 각 장면에 나레이션: 을 반드시 포함하세요
 - 첫 3초 안에 시청자의 주의를 끌어야 합니다
 - 각 장면은 명확한 비주얼 설명을 포함해야 합니다
-- 나레이션은 자연스러운 구어체로 작성하세요"""
+- 나레이션은 자연스러운 구어체로 작성하세요
+- [장면 N]: 과 나레이션: 외에 다른 텍스트를 추가하지 마세요"""
 
 
 def parse_script_response(raw_text: str) -> dict:
@@ -49,6 +63,14 @@ def parse_script_response(raw_text: str) -> dict:
         elif line.startswith("나레이션:") or line.startswith("Narration:"):
             if current_scene is not None:
                 current_scene["narration"] = line.split(":", 1)[1].strip()
+            else:
+                # 폴백: [장면] 없이 나레이션만 있는 경우 자동 장면 생성
+                scene_num = len(scenes) + 1
+                narration = line.split(":", 1)[1].strip()
+                scenes.append({
+                    "visual": f"[장면 {scene_num}]: {narration[:50]}",
+                    "narration": narration,
+                })
         elif current_scene is not None:
             current_scene["narration"] += " " + line
 
