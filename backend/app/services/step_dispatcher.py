@@ -3,6 +3,7 @@
 파이프라인 단계 이름을 받아 적절한 Celery 워커 태스크를 실행한다.
 이전 단계의 출력을 다음 단계의 입력으로 연결한다.
 """
+from __future__ import annotations
 
 from supabase import Client
 
