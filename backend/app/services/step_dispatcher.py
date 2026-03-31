@@ -193,8 +193,12 @@ def _dispatch_subtitle(
     tts_output = prev_outputs.get("tts", {})
     audio_url = tts_output.get("audio_url", "")
     language = config.get("language", "ko")
+    # script 프로바이더: 스크립트 나레이션으로 자막 생성 (무료)
+    script_output = prev_outputs.get("script", {})
+    scenes = script_output.get("scenes", [])
     return generate_subtitles_task.apply_async(
         args=[project_id, audio_url, api_key or "", language],
+        kwargs={"scenes": scenes},
         link=success_cb,
         link_error=error_cb,
     )

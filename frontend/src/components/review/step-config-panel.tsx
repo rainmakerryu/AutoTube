@@ -43,6 +43,7 @@ const STEP_PROVIDERS: Record<string, ProviderOption[]> = {
   video: [],
   subtitle: [
     { id: "openai", name: "Whisper", models: ["whisper-1"] },
+    { id: "script", name: "스크립트 기반 (무료)", models: ["narration-sync"], free: true },
   ],
   metadata: [
     { id: "openai", name: "OpenAI", models: ["gpt-4o"] },
@@ -68,7 +69,7 @@ interface StepConfigPanelProps {
 }
 
 // API 키가 필요 없는 무료/로컬 프로바이더
-const FREE_PROVIDERS = new Set(["edgetts", "ollama", "comfyui"]);
+const FREE_PROVIDERS = new Set(["edgetts", "ollama", "comfyui", "script"]);
 
 export function StepConfigPanel({ step, onRun, isLoading }: StepConfigPanelProps) {
   const providers = STEP_PROVIDERS[step] ?? [];

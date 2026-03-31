@@ -87,14 +87,58 @@ def split_long_subtitle(text: str) -> list[str]:
     return lines
 
 
+DEFAULT_SCENE_DURATION_SECONDS = 5.0
+
+
+def generate_script_based_subtitles(scenes: list[dict]) -> list[dict]:
+    """Generate subtitle segments from script scenes (no API needed).
+
+    Each scene's narration becomes a subtitle segment with evenly spaced timing.
+    """
+    segments: list[dict] = []
+    current_time = 0.0
+
+    for scene in scenes:
+        narration = scene.get("narration", "").strip()
+        if not narration:
+            current_time += DEFAULT_SCENE_DURATION_SECONDS
+            continue
+
+        duration = DEFAULT_SCENE_DURATION_SECONDS
+        segments.append({
+            "start": current_time,
+            "end": current_time + duration,
+            "text": narration,
+        })
+        current_time += duration
+
+    return segments
+
+
 @celery_app.task(name="pipeline.generate_subtitles")
 def generate_subtitles_task(
     project_id: int,
     audio_url: str,
     api_key: str,
     language: str = "ko",
+    scenes: list[dict] | None = None,
 ) -> dict:
-    """Generate SRT subtitles from audio. Returns dict with srt_content and segment_count."""
+    """Generate SRT subtitles.
+
+    If scenes are provided and no api_key, generates subtitles from script text.
+    Otherwise uses Whisper API for speech-to-text.
+    """
+    # Script-based fallback (free, no API needed)
+    if scenes and not api_key:
+        segments = generate_script_based_subtitles(scenes)
+        srt_content = segments_to_srt(segments)
+        return {
+            "srt_content": srt_content,
+            "segment_count": len(segments),
+            "provider": "script",
+        }
+
+    # Whisper API
     audio_response = httpx.get(audio_url, timeout=API_TIMEOUT_SECONDS)
     audio_response.raise_for_status()
 
@@ -119,4 +163,5 @@ def generate_subtitles_task(
     return {
         "srt_content": srt_content,
         "segment_count": len(segments),
+        "provider": "openai",
     }

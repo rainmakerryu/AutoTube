@@ -17,6 +17,7 @@ import { ScriptReview } from "@/components/review/script-review";
 import { TtsReview } from "@/components/review/tts-review";
 import { ImagesReview } from "@/components/review/images-review";
 import { MetadataReview } from "@/components/review/metadata-review";
+import { VideoReview } from "@/components/review/video-review";
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -350,8 +351,16 @@ function ReviewContent({
           onReject={onReject}
         />
       );
+    case "video":
+      return (
+        <VideoReview
+          outputData={outputData as Parameters<typeof VideoReview>[0]["outputData"]}
+          onApprove={() => onApprove()}
+          onReject={onReject}
+        />
+      );
     default:
-      // video, subtitle 등 — 간단한 승인/재생성 버튼
+      // subtitle 등 — 간단한 승인/재생성 버튼
       return (
         <div className="space-y-3">
           <pre className="text-xs bg-zinc-900 p-3 rounded overflow-auto max-h-60">

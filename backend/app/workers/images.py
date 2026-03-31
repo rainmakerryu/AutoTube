@@ -221,14 +221,20 @@ def _generate_comfyui_images(
     reference_filename: str | None = None
 
     for i, prompt in enumerate(prompts):
-        if i == 0 or reference_filename is None:
-            workflow = build_txt2img_workflow(prompt, width, height, seed=i)
-        else:
-            workflow = build_ipadapter_workflow(
+        workflow = build_txt2img_workflow(prompt, width, height, seed=i)
+
+        # IP-Adapter가 설치된 경우에만 스타일 일관성 워크플로우 사용
+        if i > 0 and reference_filename is not None:
+            ipadapter_workflow = build_ipadapter_workflow(
                 prompt, reference_filename, width, height, seed=i,
             )
-
-        prompt_id = submit_workflow(url, workflow)
+            try:
+                prompt_id = submit_workflow(url, ipadapter_workflow)
+            except ComfyUIError:
+                # IP-Adapter 노드 미설치 시 txt2img로 폴백
+                prompt_id = submit_workflow(url, workflow)
+        else:
+            prompt_id = submit_workflow(url, workflow)
         outputs = poll_comfyui_result(url, prompt_id)
 
         output_filename = _extract_output_filename(outputs)

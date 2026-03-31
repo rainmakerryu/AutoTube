@@ -15,9 +15,18 @@ interface ImagesReviewProps {
   onReject: () => void;
 }
 
+function toImageSrc(value: string | null): string | null {
+  if (!value) return null;
+  // Already a URL or data URI
+  if (value.startsWith("http") || value.startsWith("data:")) return value;
+  // Raw base64 — add data URI prefix
+  return `data:image/png;base64,${value}`;
+}
+
 export function ImagesReview({ outputData, onApprove, onReject }: ImagesReviewProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const images = outputData.image_urls ?? [];
+  const rawImages = outputData.image_urls ?? [];
+  const images = rawImages.map(toImageSrc).filter((src): src is string => src !== null);
 
   return (
     <div className="space-y-4">
