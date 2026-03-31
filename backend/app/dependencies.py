@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import jwt as pyjwt
 import httpx
 from fastapi import HTTPException, Depends
