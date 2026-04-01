@@ -1,3 +1,13 @@
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+# 로컬 미디어 저장 경로 (프로젝트 루트/media)
+MEDIA_ROOT = Path(__file__).resolve().parent.parent.parent / "media"
+# 백엔드 서버 URL (로컬 미디어 URL 생성용)
+LOCAL_BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
+
 DEFAULT_PRESIGNED_EXPIRY_SECONDS = 3600  # 1시간
 MAX_PRESIGNED_EXPIRY_SECONDS = 86400  # 24시간
 MIN_PRESIGNED_EXPIRY_SECONDS = 1
@@ -42,6 +52,82 @@ def validate_presigned_expiry(seconds: int) -> int:
     반환값: MIN_PRESIGNED_EXPIRY_SECONDS ~ MAX_PRESIGNED_EXPIRY_SECONDS 사이의 값
     """
     return max(MIN_PRESIGNED_EXPIRY_SECONDS, min(seconds, MAX_PRESIGNED_EXPIRY_SECONDS))
+
+
+def _get_output_dir() -> Path | None:
+    """사용자 지정 출력 디렉토리를 반환. OUTPUT_DIR 환경변수 또는 settings 사용."""
+    output_dir = os.environ.get("OUTPUT_DIR", "~/Downloads/AutoTube")
+    if not output_dir:
+        return None
+    return Path(output_dir).expanduser()
+
+
+def save_to_output_dir(project_id: int, filename: str, data: bytes) -> str | None:
+    """사용자 지정 출력 디렉토리에 파일을 저장한다.
+
+    Returns:
+        저장된 파일의 절대 경로. 출력 디렉토리 미설정 시 None.
+    """
+    output_dir = _get_output_dir()
+    if output_dir is None:
+        return None
+    dest = output_dir / f"project_{project_id}" / filename
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(data)
+    return str(dest)
+
+
+def copy_to_output_dir(project_id: int, filename: str, src_path: str) -> str | None:
+    """사용자 지정 출력 디렉토리에 파일을 복사한다.
+
+    Returns:
+        저장된 파일의 절대 경로. 출력 디렉토리 미설정 시 None.
+    """
+    import shutil
+
+    output_dir = _get_output_dir()
+    if output_dir is None:
+        return None
+    dest = output_dir / f"project_{project_id}" / filename
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src_path, dest)
+    return str(dest)
+
+
+def save_local(key: str, data: bytes) -> str:
+    """로컬 media/ 디렉토리에 파일을 저장하고 서빙 URL을 반환한다.
+
+    Args:
+        key: 스토리지 키 (예: projects/42/tts/audio.mp3)
+        data: 파일 바이트 데이터
+
+    Returns:
+        로컬 백엔드 미디어 URL (예: http://localhost:8000/media/projects/42/tts/audio.mp3)
+    """
+    file_path = MEDIA_ROOT / key
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_bytes(data)
+    return f"{LOCAL_BACKEND_URL}/media/{key}"
+
+
+def copy_to_local(src_path: str, key: str) -> str:
+    """로컬 파일을 media/ 디렉토리로 복사하고 서빙 URL을 반환한다.
+
+    임시 디렉토리의 파일을 영구 저장소로 옮길 때 사용한다.
+
+    Args:
+        src_path: 원본 파일 경로
+        key: 스토리지 키 (예: projects/42/video/output.mp4)
+
+    Returns:
+        로컬 백엔드 미디어 URL
+    """
+    import shutil
+
+    dest_path = MEDIA_ROOT / key
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src_path, dest_path)
+    return f"{LOCAL_BACKEND_URL}/media/{key}"
 
 
 class StorageService:

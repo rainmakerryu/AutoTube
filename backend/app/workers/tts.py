@@ -6,7 +6,12 @@ import os
 import httpx
 
 from app.celery_app import celery_app
-from app.services.storage import StorageService, build_storage_key
+from app.services.storage import (
+    StorageService,
+    build_storage_key,
+    save_local,
+    save_to_output_dir,
+)
 
 try:
     import edge_tts
@@ -43,12 +48,17 @@ def _get_storage() -> StorageService | None:
 
 
 def _upload_audio(project_id: int, audio_data: bytes) -> str | None:
-    """오디오를 R2에 업로드하고 URL을 반환. R2 미설정 시 None."""
-    storage = _get_storage()
-    if storage is None:
-        return None
+    """오디오를 저장하고 URL을 반환. R2 설정 시 R2, 미설정 시 로컬 저장.
+    동시에 사용자 출력 디렉토리에도 복사한다."""
     key = build_storage_key(project_id, "tts", AUDIO_FILENAME)
-    return storage.upload_file(key, audio_data, AUDIO_CONTENT_TYPE)
+    storage = _get_storage()
+    if storage is not None:
+        url = storage.upload_file(key, audio_data, AUDIO_CONTENT_TYPE)
+    else:
+        url = save_local(key, audio_data)
+    # 사용자 출력 디렉토리에도 저장
+    save_to_output_dir(project_id, AUDIO_FILENAME, audio_data)
+    return url
 
 
 def build_tts_request(

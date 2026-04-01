@@ -80,6 +80,9 @@ export default function ProjectDetailPage() {
   const [isCancelling, setIsCancelling] = useState(false);
 
   const isPipelineActive = pipelineSteps.length > 0 && project?.status !== "draft";
+  const allStepsDone = pipelineSteps.length > 0 && pipelineSteps.every(
+    (s) => s.status === "approved" || s.status === "completed"
+  );
 
   useEffect(() => {
     async function fetchData() {
@@ -194,12 +197,7 @@ export default function ProjectDetailPage() {
               {isCancelling ? "취소 중..." : "취소"}
             </Button>
           )}
-          {project?.status === "completed" && (
-            <Button variant="outline">
-              <Download className="mr-2 h-4 w-4" />
-              다운로드
-            </Button>
-          )}
+          {/* 다운로드 버튼은 pipeline-wizard 완료 카드에서 제공 */}
         </div>
       </div>
 
@@ -212,19 +210,6 @@ export default function ProjectDetailPage() {
           projectId={projectId}
           initialSteps={pipelineSteps}
         />
-      )}
-
-      {project?.status === "completed" && (
-        <Card className="border-zinc-800 bg-zinc-900/50">
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-zinc-400">출력물</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-zinc-500">
-              영상과 에셋이 준비되면 여기에 표시됩니다.
-            </p>
-          </CardContent>
-        </Card>
       )}
 
       <Card className="border-zinc-800 bg-zinc-900/50">

@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
     supabase_jwt_secret: str = ""
     cors_origins: list[str] = ["http://localhost:3000"]
+    output_dir: str = "~/Downloads/AutoTube"
 
     model_config = {"env_file": ".env"}
 

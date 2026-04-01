@@ -20,7 +20,8 @@ export async function apiClient(path: string, options: RequestInit = {}) {
   }
 
   const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), 8000); // 8 seconds timeout
+  const API_TIMEOUT_MS = 30000;
+  const id = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
   try {
     const res = await fetch(url, {
