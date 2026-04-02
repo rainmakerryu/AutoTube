@@ -68,6 +68,9 @@ export function PipelineWizard({ projectId, initialSteps }: PipelineWizardProps)
   const [stepOutput, setStepOutput] = useState<Record<string, unknown> | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [videoOutput, setVideoOutput] = useState<{ video_url?: string; output_path?: string } | null>(null);
+  const [subtitleOutput, setSubtitleOutput] = useState<{ subtitle_url?: string } | null>(null);
+  const [ttsOutput, setTtsOutput] = useState<{ audio_url?: string } | null>(null);
 
   // 현재 포커스할 단계 결정
   useEffect(() => {
@@ -180,6 +183,35 @@ export function PipelineWizard({ projectId, initialSteps }: PipelineWizardProps)
     (s) => s.status === "approved" || s.status === "completed"
   ).length;
   const progressPercent = steps.length > 0 ? Math.round((completedCount / steps.length) * 100) : 0;
+  const isAllComplete = progressPercent === 100;
+
+  // 모든 단계 완료 시 각 단계 output 로드
+  useEffect(() => {
+    if (!isAllComplete || videoOutput) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [videoData, subtitleData, ttsData] = await Promise.all([
+          getStepOutput(projectId, "video").catch(() => null),
+          getStepOutput(projectId, "subtitle").catch(() => null),
+          getStepOutput(projectId, "tts").catch(() => null),
+        ]);
+        if (cancelled) return;
+        if (videoData?.output_data) {
+          setVideoOutput(videoData.output_data as { video_url?: string; output_path?: string });
+        }
+        if (subtitleData?.output_data) {
+          setSubtitleOutput(subtitleData.output_data as { subtitle_url?: string });
+        }
+        if (ttsData?.output_data) {
+          setTtsOutput(ttsData.output_data as { audio_url?: string });
+        }
+      } catch {
+        // 무시
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAllComplete, projectId, videoOutput]);
 
   return (
     <div className="space-y-6">
@@ -221,6 +253,59 @@ export function PipelineWizard({ projectId, initialSteps }: PipelineWizardProps)
           />
         </div>
       </div>
+
+      {/* 파이프라인 완료 — 다운로드 */}
+      {isAllComplete && (
+        <Card className="border-emerald-800/50 bg-emerald-950/20">
+          <CardContent className="pt-5 space-y-4">
+            <div className="text-center space-y-2">
+              <p className="text-sm font-medium text-emerald-300">
+                영상 제작이 완료되었습니다
+              </p>
+              {videoOutput?.output_path && (
+                <p className="text-xs text-muted-foreground truncate">
+                  저장 위치: {videoOutput.output_path}
+                </p>
+              )}
+            </div>
+            {(videoOutput?.video_url || subtitleOutput?.subtitle_url || ttsOutput?.audio_url) ? (
+              <div className="flex flex-wrap justify-center gap-2">
+                {videoOutput?.video_url && (
+                  <a
+                    href={videoOutput.video_url}
+                    download="output.mp4"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500 transition-colors"
+                  >
+                    영상 (MP4)
+                  </a>
+                )}
+                {ttsOutput?.audio_url && (
+                  <a
+                    href={ttsOutput.audio_url}
+                    download="audio.mp3"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 transition-colors"
+                  >
+                    음성 (MP3)
+                  </a>
+                )}
+                {subtitleOutput?.subtitle_url && (
+                  <a
+                    href={subtitleOutput.subtitle_url}
+                    download="subtitle.srt"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 transition-colors"
+                  >
+                    자막 (SRT)
+                  </a>
+                )}
+              </div>
+            ) : (
+              <p className="text-center text-xs text-muted-foreground">
+                이전에 생성된 프로젝트입니다. 영상을 다시 생성하면 다운로드할 수 있습니다.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* 에러 메시지 */}
       {error && (

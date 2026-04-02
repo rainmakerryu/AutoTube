@@ -10,7 +10,12 @@ import httpx
 from PIL import Image
 
 from app.celery_app import celery_app
-from app.services.storage import StorageService, build_storage_key
+from app.services.storage import (
+    StorageService,
+    build_storage_key,
+    copy_to_local,
+    copy_to_output_dir,
+)
 
 SHORTS_RESOLUTION = (1080, 1920)
 LONGFORM_RESOLUTION = (1920, 1080)
@@ -29,6 +34,42 @@ VIDEO_FILENAME = "output.mp4"
 VIDEO_CONTENT_TYPE = "video/mp4"
 VIDEO_CODEC = "libx264"
 AUDIO_CODEC = "aac"
+
+
+def validate_inputs(
+    image_paths: list[str],
+    audio_path: str | None,
+    video_type: str,
+) -> list[str]:
+    """입력값을 검증하고 에러 메시지 목록을 반환한다. 빈 리스트면 유효."""
+    errors: list[str] = []
+
+    if not image_paths:
+        errors.append("이미지 경로가 없습니다. 최소 1개 이상의 이미지가 필요합니다.")
+    else:
+        for path in image_paths:
+            ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+            if ext not in SUPPORTED_IMAGE_FORMATS:
+                errors.append(
+                    f"지원하지 않는 이미지 형식입니다: .{ext}. "
+                    f"지원 형식: {', '.join(sorted(SUPPORTED_IMAGE_FORMATS))}"
+                )
+
+    if audio_path is not None:
+        ext = audio_path.rsplit(".", 1)[-1].lower() if "." in audio_path else ""
+        if ext not in SUPPORTED_AUDIO_FORMATS:
+            errors.append(
+                f"지원하지 않는 오디오 형식입니다: .{ext}. "
+                f"지원 형식: {', '.join(sorted(SUPPORTED_AUDIO_FORMATS))}"
+            )
+
+    if video_type not in ("shorts", "longform"):
+        errors.append(
+            f"지원하지 않는 video_type입니다: '{video_type}'. "
+            "'shorts' 또는 'longform'을 사용하세요."
+        )
+
+    return errors
 
 
 def get_resolution(video_type: str) -> tuple[int, int]:
@@ -239,17 +280,26 @@ def compose_video_task(
 
             clips.append(clip)
 
-        # 5. Crossfade concat
+        # 5. Crossfade concat (moviepy v2: crossfadein 제거됨, CompositeVideoClip 사용)
         if len(clips) > 1:
-            # crossfadein/crossfadeout 을 사용한 부드러운 전환
-            transition_clips = [clips[0]]
-            for clip in clips[1:]:
-                transition_clips.append(clip.crossfadein(FADE_DURATION_SECONDS))
-            final_video = concatenate_videoclips(
-                transition_clips,
-                method="compose",
-                padding=-FADE_DURATION_SECONDS,
-            )
+            from moviepy import CompositeVideoClip
+            from moviepy.video.fx import CrossFadeIn, CrossFadeOut
+
+            # 각 클립에 fade 효과 적용 후 겹치도록 start 시간 배치
+            positioned: list = []
+            current_start = 0.0
+            for i, clip in enumerate(clips):
+                effects = []
+                if i > 0:
+                    effects.append(CrossFadeIn(FADE_DURATION_SECONDS))
+                if i < len(clips) - 1:
+                    effects.append(CrossFadeOut(FADE_DURATION_SECONDS))
+                faded = clip.with_effects(effects) if effects else clip
+                positioned.append(faded.with_start(current_start))
+                current_start += clip.duration - FADE_DURATION_SECONDS
+
+            total_duration = current_start + clips[-1].duration
+            final_video = CompositeVideoClip(positioned, size=resolution).with_duration(total_duration)
         else:
             final_video = clips[0]
 
@@ -278,17 +328,22 @@ def compose_video_task(
         for clip in clips:
             clip.close()
 
-        # 8. R2 업로드
-        video_url = None
+        # 8. 저장 (R2 또는 로컬)
+        key = build_storage_key(project_id, "video", VIDEO_FILENAME)
         storage = _get_storage()
         if storage:
             with open(output_path, "rb") as f:
                 video_data = f.read()
-            key = build_storage_key(project_id, "video", VIDEO_FILENAME)
             video_url = storage.upload_file(key, video_data, VIDEO_CONTENT_TYPE)
+        else:
+            video_url = copy_to_local(output_path, key)
+
+        # 사용자 출력 디렉토리에도 복사
+        output_saved = copy_to_output_dir(project_id, VIDEO_FILENAME, output_path)
 
         return {
             "video_url": video_url,
+            "output_path": output_saved,
             "resolution": list(resolution),
             "duration": round(total_duration, 2),
             "fps": DEFAULT_FPS,

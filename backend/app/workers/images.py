@@ -22,6 +22,15 @@ CONSISTENCY_PROMPT_PREFIX = (
 )
 CONSISTENCY_STYLE_REFERENCE = "Match the established style: {style}. "
 
+IMAGE_STYLE_PROMPTS: dict[str, str] = {
+    "realistic": "Photorealistic, high quality photograph, detailed, natural lighting. ",
+    "cinematic": "Cinematic style, dramatic lighting, film grain, movie-like composition, widescreen feel. ",
+    "anime": "Japanese anime style, vibrant colors, cel shading, manga-inspired illustration. ",
+    "watercolor": "Watercolor painting style, soft colors, fluid brushstrokes, artistic. ",
+    "3d": "3D rendered, CGI quality, volumetric lighting, modern 3D graphics. ",
+    "minimal": "Minimalist design, clean lines, simple shapes, limited color palette, modern. ",
+}
+
 
 def extract_visual_keywords(scene: dict) -> str:
     """Extract keywords from scene visual description for image search/generation.
@@ -41,12 +50,17 @@ def extract_visual_keywords(scene: dict) -> str:
     return visual
 
 
-def build_consistent_prompts(scenes: list[dict]) -> list[str]:
+def build_consistent_prompts(
+    scenes: list[dict],
+    style: str = "",
+) -> list[str]:
     """Build prompts with style consistency instructions.
 
     First scene sets the style reference. Subsequent scenes include
     the reference to maintain visual coherence across the video.
+    If style is provided, prepend style-specific prompt prefix.
     """
+    style_prefix = IMAGE_STYLE_PROMPTS.get(style, "")
     prompts: list[str] = []
     style_description = ""
 
@@ -54,10 +68,10 @@ def build_consistent_prompts(scenes: list[dict]) -> list[str]:
         keywords = extract_visual_keywords(scene)
         if i == 0:
             style_description = keywords
-            prompt = f"{CONSISTENCY_PROMPT_PREFIX}Style reference: {keywords}"
+            prompt = f"{style_prefix}{CONSISTENCY_PROMPT_PREFIX}Style reference: {keywords}"
         else:
             style_ref = CONSISTENCY_STYLE_REFERENCE.format(style=style_description)
-            prompt = f"{CONSISTENCY_PROMPT_PREFIX}{style_ref}Scene: {keywords}"
+            prompt = f"{style_prefix}{CONSISTENCY_PROMPT_PREFIX}{style_ref}Scene: {keywords}"
         prompts.append(prompt)
 
     return prompts
@@ -300,10 +314,11 @@ def generate_images_task(
     provider: str,
     api_key: str,
     video_type: str = "shorts",
+    style: str = "",
 ) -> dict:
     """Generate images for each scene. Returns dict with image_urls list and metadata."""
     limited_scenes = scenes[:MAX_IMAGES_PER_PROJECT]
-    prompts = build_consistent_prompts(limited_scenes)
+    prompts = build_consistent_prompts(limited_scenes, style=style)
 
     if provider == "comfyui":
         image_urls = _generate_comfyui_images(prompts, api_key, video_type)

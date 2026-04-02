@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import json
 
 import httpx
 
 from app.celery_app import celery_app
+from app.services.storage import save_to_output_dir
 
 MAX_TITLE_LENGTH = 100
 MAX_DESCRIPTION_LENGTH = 5000
@@ -174,4 +177,10 @@ def generate_metadata_task(
 
     raw = extract_text_from_response(api_provider, response.json())
     metadata = parse_metadata_response(raw)
-    return validate_metadata(metadata)
+    validated = validate_metadata(metadata)
+
+    # 사용자 출력 디렉토리에 메타데이터 JSON 저장
+    metadata_json = json.dumps(validated, ensure_ascii=False, indent=2)
+    save_to_output_dir(project_id, "metadata.json", metadata_json.encode("utf-8"))
+
+    return validated

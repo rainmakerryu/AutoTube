@@ -120,11 +120,19 @@ def dispatch_step(
     return task.id
 
 
+def _get_pipeline_sub_config(project: dict, key: str) -> dict:
+    """pipeline_config에서 하위 설정(script_config, voice_config 등)을 가져온다."""
+    pipeline_config = project.get("pipeline_config") or {}
+    return pipeline_config.get(key) or {}
+
+
 def _dispatch_script(
     *, project_id, project, provider, api_key, config, prev_outputs,
     success_cb, error_cb,
 ):
-    language = config.get("language", "ko")
+    script_cfg = _get_pipeline_sub_config(project, "script_config")
+    language = config.get("language") or script_cfg.get("language", "ko")
+
     return generate_script_task.apply_async(
         args=[
             project_id,
@@ -134,6 +142,7 @@ def _dispatch_script(
             api_key or "",
             language,
         ],
+        kwargs={"script_config": script_cfg},
         link=success_cb,
         link_error=error_cb,
     )
@@ -143,15 +152,18 @@ def _dispatch_tts(
     *, project_id, project, provider, api_key, config, prev_outputs,
     success_cb, error_cb,
 ):
+    voice_cfg = _get_pipeline_sub_config(project, "voice_config")
     script_output = prev_outputs.get("script", {})
     scenes = script_output.get("scenes", [])
-    # 모든 장면의 내레이션을 합쳐 TTS 입력으로 사용
     narration_text = "\n\n".join(
         scene.get("narration", "") for scene in scenes
     )
-    voice_id = config.get("voice_id")
+    voice_id = config.get("voice_id") or voice_cfg.get("voice_id")
+    speed = voice_cfg.get("speed", 1.0)
+    emotion = voice_cfg.get("emotion", "normal")
     return generate_tts_task.apply_async(
         args=[project_id, narration_text, provider, api_key, voice_id],
+        kwargs={"speed": speed, "emotion": emotion},
         link=success_cb,
         link_error=error_cb,
     )
@@ -161,11 +173,14 @@ def _dispatch_images(
     *, project_id, project, provider, api_key, config, prev_outputs,
     success_cb, error_cb,
 ):
+    image_cfg = _get_pipeline_sub_config(project, "image_config")
     script_output = prev_outputs.get("script", {})
     scenes = script_output.get("scenes", [])
     video_type = project.get("type", "shorts")
+    style = image_cfg.get("style", "")
     return generate_images_task.apply_async(
         args=[project_id, scenes, provider, api_key or "", video_type],
+        kwargs={"style": style},
         link=success_cb,
         link_error=error_cb,
     )

@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 interface VideoReviewProps {
   outputData: {
     video_url?: string;
+    output_path?: string;
     resolution?: number[];
     duration?: number;
     fps?: number;
@@ -64,6 +65,23 @@ export function VideoReview({ outputData, onApprove, onReject }: VideoReviewProp
               <span>장면: {outputData.scene_count}개</span>
             )}
           </div>
+
+          {outputData.video_url && (
+            <div className="flex items-center gap-3">
+              <a
+                href={outputData.video_url}
+                download="output.mp4"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 text-sm text-zinc-200 hover:bg-zinc-700 transition-colors"
+              >
+                다운로드
+              </a>
+              {outputData.output_path && (
+                <span className="text-xs text-muted-foreground truncate max-w-xs">
+                  저장됨: {outputData.output_path}
+                </span>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

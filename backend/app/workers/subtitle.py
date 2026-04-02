@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import httpx
 
 from app.celery_app import celery_app
+from app.services.storage import build_storage_key, save_local, save_to_output_dir
 
 WHISPER_API_URL = "https://api.openai.com/v1/audio/transcriptions"
 WHISPER_MODEL = "whisper-1"
@@ -88,6 +91,16 @@ def split_long_subtitle(text: str) -> list[str]:
 
 
 DEFAULT_SCENE_DURATION_SECONDS = 5.0
+SRT_FILENAME = "subtitle.srt"
+
+
+def _save_srt(project_id: int, srt_content: str) -> str | None:
+    """SRT 파일을 로컬 media + 사용자 출력 디렉토리에 저장하고 서빙 URL을 반환."""
+    srt_bytes = srt_content.encode("utf-8")
+    key = build_storage_key(project_id, "subtitle", SRT_FILENAME)
+    url = save_local(key, srt_bytes)
+    save_to_output_dir(project_id, SRT_FILENAME, srt_bytes)
+    return url
 
 
 def generate_script_based_subtitles(scenes: list[dict]) -> list[dict]:
@@ -132,8 +145,10 @@ def generate_subtitles_task(
     if scenes and not api_key:
         segments = generate_script_based_subtitles(scenes)
         srt_content = segments_to_srt(segments)
+        subtitle_url = _save_srt(project_id, srt_content)
         return {
             "srt_content": srt_content,
+            "subtitle_url": subtitle_url,
             "segment_count": len(segments),
             "provider": "script",
         }
@@ -159,9 +174,11 @@ def generate_subtitles_task(
 
     segments = parse_whisper_response(response.json())
     srt_content = segments_to_srt(segments)
+    subtitle_url = _save_srt(project_id, srt_content)
 
     return {
         "srt_content": srt_content,
+        "subtitle_url": subtitle_url,
         "segment_count": len(segments),
         "provider": "openai",
     }
