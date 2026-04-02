@@ -132,7 +132,19 @@ def split_text_for_tts(text: str) -> list[str]:
     return chunks
 
 
-def _generate_edge_tts(text: str, voice: str) -> bytes:
+def _speed_to_edge_tts_rate(speed: float) -> str:
+    """Convert speed float (0.5-2.0) to Edge TTS rate string (e.g. '+20%', '-30%')."""
+    percentage = round((speed - 1.0) * 100)
+    if percentage >= 0:
+        return f"+{percentage}%"
+    return f"{percentage}%"
+
+
+def _generate_edge_tts(
+    text: str,
+    voice: str,
+    speed: float = 1.0,
+) -> bytes:
     """Run edge-tts in a synchronous context via asyncio."""
     if not EDGE_TTS_AVAILABLE:
         raise ValueError(
@@ -140,8 +152,10 @@ def _generate_edge_tts(text: str, voice: str) -> bytes:
             "'pip install edge-tts'로 설치하세요."
         )
 
+    rate = _speed_to_edge_tts_rate(speed)
+
     async def _run() -> bytes:
-        communicate = edge_tts.Communicate(text, voice)
+        communicate = edge_tts.Communicate(text, voice, rate=rate)
         audio_chunks: list[bytes] = []
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
@@ -158,11 +172,13 @@ def generate_tts_task(
     provider: str,
     api_key: str | None = None,
     voice_id: str | None = None,
+    speed: float = 1.0,
+    emotion: str = "normal",
 ) -> dict:
     # Edge TTS: 로컬 라이브러리 직접 호출 (API 키 불필요)
     if provider == "edgetts":
         voice = voice_id or EDGE_TTS_DEFAULT_VOICE
-        audio_data = _generate_edge_tts(text, voice)
+        audio_data = _generate_edge_tts(text, voice, speed=speed)
         audio_url = _upload_audio(project_id, audio_data)
         return {
             "audio_url": audio_url,
@@ -177,6 +193,9 @@ def generate_tts_task(
 
     for chunk in chunks:
         request = build_tts_request(chunk, provider, api_key or "", voice_id)
+        # OpenAI TTS: speed 파라미터 지원
+        if provider == "openai" and request and speed != 1.0:
+            request["json"]["speed"] = speed
         response = httpx.post(
             request["url"],
             headers=request["headers"],

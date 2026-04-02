@@ -10,10 +10,75 @@ SHORTS_SCENES = "3-5"
 LONGFORM_SCENES = "15-25"
 
 
-def build_script_prompt(topic: str, video_type: str, language: str = "ko") -> str:
+TONE_MAP = {
+    "humor": "가벼운 유머러스한",
+    "honest": "솔직하고 진솔한",
+    "persuasive": "설득력 있는",
+    "calm": "차분하고 안정된",
+    "friendly": "친절하고 따뜻한",
+}
+
+PURPOSE_MAP = {
+    "sales": "제품 판매를 위한",
+    "promotion": "브랜드/서비스 홍보를 위한",
+    "daily": "일상/브이로그 느낌의",
+}
+
+SPEECH_STYLE_MAP = {
+    "formal": "합니다체 (격식 존댓말)",
+    "polite": "해요체 (비격식 존댓말)",
+    "casual": "반말 (비격식체)",
+}
+
+
+def build_script_prompt(
+    topic: str,
+    video_type: str,
+    language: str = "ko",
+    script_config: dict | None = None,
+) -> str:
     is_shorts = video_type == "shorts"
     duration = SHORTS_DURATION if is_shorts else LONGFORM_DURATION
     scene_count = SHORTS_SCENES if is_shorts else LONGFORM_SCENES
+    cfg = script_config or {}
+
+    # 톤, 목적, 말투 지시문 생성
+    extra_instructions: list[str] = []
+
+    tone_id = cfg.get("tone", "auto")
+    if tone_id != "auto" and tone_id in TONE_MAP:
+        extra_instructions.append(f"- 톤: {TONE_MAP[tone_id]} 톤으로 작성하세요")
+
+    purpose_id = cfg.get("purpose", "auto")
+    if purpose_id != "auto" and purpose_id in PURPOSE_MAP:
+        extra_instructions.append(f"- 목적: {PURPOSE_MAP[purpose_id]} 영상입니다")
+
+    speech_id = cfg.get("speech_style", "auto")
+    if speech_id != "auto" and speech_id in SPEECH_STYLE_MAP:
+        extra_instructions.append(f"- 말투: {SPEECH_STYLE_MAP[speech_id]}로 작성하세요")
+
+    opening = cfg.get("opening_comment", "").strip()
+    if opening:
+        extra_instructions.append(f"- 오프닝 멘트: 첫 장면 나레이션에 다음 멘트를 포함하세요: \"{opening}\"")
+
+    closing = cfg.get("closing_comment", "").strip()
+    if closing:
+        extra_instructions.append(f"- 클로징 멘트: 마지막 장면 나레이션에 다음 멘트를 포함하세요: \"{closing}\"")
+
+    product_name = cfg.get("product_name", "").strip()
+    if product_name:
+        extra_instructions.append(f"- 제품명: \"{product_name}\"을 자연스럽게 언급하세요")
+
+    required_info = cfg.get("required_info", "").strip()
+    if required_info:
+        extra_instructions.append(f"- 필수 정보: 다음 내용을 반드시 포함하세요: {required_info}")
+
+    reference_script = cfg.get("reference_script", "").strip()
+    if reference_script:
+        extra_instructions.append(f"- 벤치마킹 참고 대본:\n{reference_script}")
+
+    extra_block = "\n".join(extra_instructions)
+    extra_section = f"\n\n추가 요구사항:\n{extra_block}" if extra_block else ""
 
     return f"""당신은 YouTube {video_type} 영상 스크립트 작가입니다.
 
@@ -43,7 +108,7 @@ def build_script_prompt(topic: str, video_type: str, language: str = "ko") -> st
 - 첫 3초 안에 시청자의 주의를 끌어야 합니다
 - 각 장면은 명확한 비주얼 설명을 포함해야 합니다
 - 나레이션은 자연스러운 구어체로 작성하세요
-- [장면 N]: 과 나레이션: 외에 다른 텍스트를 추가하지 마세요"""
+- [장면 N]: 과 나레이션: 외에 다른 텍스트를 추가하지 마세요{extra_section}"""
 
 
 def parse_script_response(raw_text: str) -> dict:
@@ -166,8 +231,16 @@ def generate_script_task(
     api_provider: str,
     api_key: str,
     language: str = "ko",
+    script_config: dict | None = None,
 ) -> dict:
-    prompt = build_script_prompt(topic, video_type, language)
+    cfg = script_config or {}
+
+    # manual 모드: API 호출 없이 입력된 대본을 바로 파싱
+    if cfg.get("mode") == "manual":
+        manual_text = cfg.get("manual_script", "")
+        return parse_script_response(manual_text)
+
+    prompt = build_script_prompt(topic, video_type, language, script_config=cfg)
     request = build_api_request(prompt, api_provider, api_key)
 
     response = httpx.post(
