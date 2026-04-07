@@ -16,6 +16,7 @@ import { StepType } from "@/components/project-form/step-type";
 import { StepScript } from "@/components/project-form/step-script";
 import { StepImageStyle } from "@/components/project-form/step-image-style";
 import { StepVoice } from "@/components/project-form/step-voice";
+import { StepSubtitle } from "@/components/project-form/step-subtitle";
 import { StepConfirm } from "@/components/project-form/step-confirm";
 
 function StepIndicator({
@@ -106,7 +107,54 @@ function buildPipelineConfig(formData: FormData): Record<string, unknown> {
     voice_id: formData.voice.voiceId,
     emotion: formData.voice.emotion,
     speed: formData.voice.speed,
+    custom_audio_url: formData.voice.customAudioUrl || undefined,
   };
+
+  // subtitle config
+  config.subtitle_config = {
+    enabled: formData.subtitle.enabled,
+    style: formData.subtitle.style,
+    font_size: formData.subtitle.fontSize,
+    position: formData.subtitle.position,
+    outline_width: formData.subtitle.outlineWidth,
+    opacity: formData.subtitle.opacity,
+  };
+
+  // video sync config
+  config.video_config = {
+    sync_mode: formData.videoSync.mode,
+    speed_factor: formData.videoSync.speedFactor,
+  };
+
+  // intro config
+  if (formData.intro.introVideoUrl || formData.intro.logoUrl) {
+    config.intro_config = {
+      intro_video_url: formData.intro.introVideoUrl || undefined,
+      logo_url: formData.intro.logoUrl || undefined,
+      logo_position: formData.intro.logoPosition,
+      logo_opacity: formData.intro.logoOpacity,
+    };
+  }
+
+  // bgm config
+  config.bgm_config = {
+    enabled: formData.bgm.enabled,
+    mood: formData.bgm.mood,
+    volume: formData.bgm.volume,
+  };
+
+  // audio post-processing config
+  if (formData.audioPost.enabled) {
+    config.audio_post_config = {
+      enabled: true,
+      mode: formData.audioPost.mode,
+    };
+  }
+
+  // thumbnail config
+  if (formData.thumbnail.enabled) {
+    config.thumbnail = true;
+  }
 
   return config;
 }
@@ -141,7 +189,8 @@ function NewProjectInner() {
     (step === 1 && isScriptStepValid) ||
     step === 2 ||
     step === 3 ||
-    (step === 4 && isScriptStepValid);
+    step === 4 ||
+    (step === 5 && isScriptStepValid);
 
   async function handleCreate() {
     setIsSubmitting(true);
@@ -175,6 +224,7 @@ function NewProjectInner() {
       onChange={updateForm}
     />,
     <StepVoice key="voice" formData={formData} onChange={updateForm} />,
+    <StepSubtitle key="subtitle" formData={formData} onChange={updateForm} />,
     <StepConfirm key="confirm" formData={formData} />,
   ];
 

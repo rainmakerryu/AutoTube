@@ -40,6 +40,9 @@ const STEP_PROVIDERS: Record<string, ProviderOption[]> = {
     { id: "pexels", name: "Pexels (스톡)", models: ["search"], free: true },
     { id: "comfyui", name: "ComfyUI (로컬)", models: ["SDXL + IP-Adapter"], free: true },
   ],
+  audio_post: [
+    { id: "local", name: "로컬 후처리 (무료)", models: ["pydub+ffmpeg"], free: true },
+  ],
   video: [],
   subtitle: [
     { id: "openai", name: "Whisper", models: ["whisper-1"] },
@@ -51,15 +54,36 @@ const STEP_PROVIDERS: Record<string, ProviderOption[]> = {
     { id: "deepseek", name: "DeepSeek", models: ["deepseek-chat"], free: true },
     { id: "ollama", name: "Ollama (로컬)", models: ["llama3", "mistral"], free: true },
   ],
+  thumbnail: [
+    { id: "openai", name: "DALL-E", models: ["dall-e-3"] },
+    { id: "gemini", name: "Gemini", models: ["gemini-2.0-flash-exp"] },
+  ],
+  bgm: [
+    { id: "library", name: "기본 라이브러리 (무료)", models: ["curated"], free: true },
+  ],
+  seo: [
+    { id: "openai", name: "OpenAI", models: ["gpt-4o"] },
+    { id: "claude", name: "Claude", models: ["claude-sonnet-4-6"] },
+    { id: "deepseek", name: "DeepSeek", models: ["deepseek-chat"], free: true },
+    { id: "ollama", name: "Ollama (로컬)", models: ["llama3", "mistral"], free: true },
+  ],
+  sns: [
+    { id: "manual", name: "직접 배포 (무료)", models: ["share-text"], free: true },
+  ],
 };
 
 const STEP_LABELS: Record<string, string> = {
   script: "스크립트 생성",
   tts: "음성 생성 (TTS)",
+  audio_post: "오디오 후처리",
   images: "이미지 생성",
   video: "영상 합성",
   subtitle: "자막 생성",
   metadata: "메타데이터 생성",
+  thumbnail: "썸네일 생성",
+  bgm: "배경 음악 (BGM)",
+  seo: "SEO 최적화",
+  sns: "SNS 배포",
 };
 
 interface StepConfigPanelProps {
@@ -69,7 +93,7 @@ interface StepConfigPanelProps {
 }
 
 // API 키가 필요 없는 무료/로컬 프로바이더
-const FREE_PROVIDERS = new Set(["edgetts", "ollama", "comfyui", "script"]);
+const FREE_PROVIDERS = new Set(["edgetts", "ollama", "comfyui", "script", "library", "manual"]);
 
 export function StepConfigPanel({ step, onRun, isLoading }: StepConfigPanelProps) {
   const providers = STEP_PROVIDERS[step] ?? [];

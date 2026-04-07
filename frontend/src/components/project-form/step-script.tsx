@@ -19,6 +19,17 @@ interface StepScriptProps {
   onChange: (data: Partial<FormData>) => void;
 }
 
+const EMOTION_TAGS = [
+  "[웃음]",
+  "[한숨]",
+  "[속삭임]",
+  "[화남]",
+  "[슬픔]",
+  "[놀람]",
+  "[하품]",
+  "[딸꾹]",
+] as const;
+
 const TABS: { mode: ScriptMode; label: string }[] = [
   { mode: "basic", label: "기본 설정" },
   { mode: "ai", label: "AI로 작성하기" },
@@ -253,6 +264,34 @@ function ManualTab({
       </div>
       <div className="space-y-2">
         <Label htmlFor="manual-script">대본 입력</Label>
+        <div className="flex flex-wrap gap-1.5 pb-1">
+          {EMOTION_TAGS.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => {
+                const el = document.getElementById(
+                  "manual-script",
+                ) as HTMLTextAreaElement | null;
+                if (!el) return;
+                const start = el.selectionStart ?? formData.script.manualScript.length;
+                const before = formData.script.manualScript.slice(0, start);
+                const after = formData.script.manualScript.slice(start);
+                updateScript(formData, onChange, {
+                  manualScript: `${before}${tag}${after}`,
+                });
+                requestAnimationFrame(() => {
+                  el.focus();
+                  const pos = start + tag.length;
+                  el.setSelectionRange(pos, pos);
+                });
+              }}
+              className="rounded-md bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-violet-900/50 hover:text-violet-300"
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
         <Textarea
           id="manual-script"
           placeholder={`장면별로 나누어 입력하세요.\n\n[장면 1]\n나레이션: 안녕하세요, 오늘은...\n\n[장면 2]\n나레이션: 다음으로...`}
@@ -264,10 +303,17 @@ function ManualTab({
             })
           }
         />
-        <p className="text-xs text-zinc-500">
-          직접 입력한 대본으로 영상이 생성됩니다. 스크립트 생성 단계가
-          스킵됩니다.
-        </p>
+        <div className="flex justify-between">
+          <p className="text-xs text-zinc-500">
+            직접 입력한 대본으로 영상이 생성됩니다. 스크립트 생성 단계가
+            스킵됩니다.
+          </p>
+          <span className="shrink-0 text-[10px] text-zinc-600">
+            {formData.script.manualScript.length}자 (공백 포함) /{" "}
+            {formData.script.manualScript.replace(/\s/g, "").length}자 (공백
+            제외)
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -304,9 +350,14 @@ function TitleTopicFields({
             updateScript(formData, onChange, { topic: e.target.value })
           }
         />
-        <p className="text-xs text-zinc-500">
-          영상 내용을 설명하세요. AI가 이를 바탕으로 스크립트를 생성합니다.
-        </p>
+        <div className="flex justify-between">
+          <p className="text-xs text-zinc-500">
+            영상 내용을 설명하세요. AI가 이를 바탕으로 스크립트를 생성합니다.
+          </p>
+          <span className="shrink-0 text-[10px] text-zinc-600">
+            {formData.script.topic.length}자
+          </span>
+        </div>
       </div>
     </>
   );

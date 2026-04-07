@@ -10,6 +10,11 @@ import {
   Loader2,
   Circle,
   XCircle,
+  Music,
+  Search,
+  Share2,
+  SlidersHorizontal,
+  ImagePlus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,10 +23,15 @@ import type { PipelineEvent } from "@/hooks/use-pipeline-sse";
 const STEP_CONFIG: Record<string, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
   script: { label: "스크립트", icon: FileText },
   tts: { label: "TTS", icon: Mic },
+  audio_post: { label: "오디오 후처리", icon: SlidersHorizontal },
   images: { label: "이미지", icon: Image },
   video: { label: "영상", icon: Video },
   subtitle: { label: "자막", icon: Subtitles },
   metadata: { label: "메타데이터", icon: FileText },
+  thumbnail: { label: "썸네일", icon: ImagePlus },
+  bgm: { label: "BGM", icon: Music },
+  seo: { label: "SEO", icon: Search },
+  sns: { label: "SNS", icon: Share2 },
 };
 
 const STATUS_LABELS: Record<string, string> = {

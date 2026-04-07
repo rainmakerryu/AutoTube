@@ -11,6 +11,12 @@ import {
   PURPOSES,
   TONES,
   SPEECH_STYLES,
+  SUBTITLE_STYLES,
+  SUBTITLE_POSITIONS,
+  SYNC_MODES,
+  LOGO_POSITIONS,
+  BGM_MOODS,
+  AUDIO_POST_MODES,
   type FormData,
 } from "./types";
 
@@ -157,7 +163,19 @@ export function StepConfirm({ formData }: StepConfirmProps) {
 
       {/* AI 보이스 */}
       <SummaryCard title="04. AI 보이스">
-        {v.enabled ? (
+        {v.enabled && v.customAudioUrl && v.customAudioUrl !== "pending" ? (
+          <>
+            <Row label="모드" value="외부 음성 업로드" />
+            <Row
+              label="파일"
+              value={
+                <span className="max-w-[260px] truncate inline-block">
+                  {v.customAudioName || "업로드된 파일"}
+                </span>
+              }
+            />
+          </>
+        ) : v.enabled ? (
           <>
             <Row
               label="음성"
@@ -191,6 +209,148 @@ export function StepConfirm({ formData }: StepConfirmProps) {
         ) : (
           <Row label="상태" value="보이스 없음" />
         )}
+      </SummaryCard>
+
+      {/* 자막 스타일 */}
+      <SummaryCard title="05. 자막 스타일">
+        {formData.subtitle.enabled && formData.subtitle.style !== "none" ? (
+          <>
+            <Row
+              label="스타일"
+              value={findLabel(SUBTITLE_STYLES, formData.subtitle.style)}
+            />
+            <Row label="글꼴 크기" value={`${formData.subtitle.fontSize}px`} />
+            <Row
+              label="위치"
+              value={findLabel(SUBTITLE_POSITIONS, formData.subtitle.position)}
+            />
+            <Row
+              label="불투명도"
+              value={`${Math.round(formData.subtitle.opacity * 100)}%`}
+            />
+          </>
+        ) : (
+          <Row label="상태" value="자막 미사용" />
+        )}
+      </SummaryCard>
+
+      {/* 영상 싱크 모드 */}
+      <SummaryCard title="05-1. 영상 싱크">
+        <Row
+          label="모드"
+          value={findLabel(SYNC_MODES, formData.videoSync.mode)}
+        />
+        {formData.videoSync.mode === "speed" && (
+          <Row
+            label="전환 속도"
+            value={`${formData.videoSync.speedFactor.toFixed(1)}x`}
+          />
+        )}
+      </SummaryCard>
+
+      {/* 인트로 / 로고 */}
+      {(formData.intro.introVideoUrl || formData.intro.logoUrl) && (
+        <SummaryCard title="05-2. 인트로 / 로고">
+          {formData.intro.introVideoUrl && (
+            <Row
+              label="인트로 영상"
+              value={
+                <span className="max-w-[200px] truncate inline-block">
+                  {formData.intro.introVideoName || "업로드됨"}
+                </span>
+              }
+            />
+          )}
+          {formData.intro.logoUrl && (
+            <>
+              <Row
+                label="로고"
+                value={
+                  <span className="max-w-[200px] truncate inline-block">
+                    {formData.intro.logoName || "업로드됨"}
+                  </span>
+                }
+              />
+              <Row
+                label="위치"
+                value={findLabel(LOGO_POSITIONS, formData.intro.logoPosition)}
+              />
+              <Row
+                label="불투명도"
+                value={`${Math.round(formData.intro.logoOpacity * 100)}%`}
+              />
+            </>
+          )}
+        </SummaryCard>
+      )}
+
+      {/* 오디오 후처리 */}
+      {formData.audioPost.enabled && (
+        <SummaryCard title="05-3. 오디오 후처리">
+          <Row
+            label="모드"
+            value={findLabel(AUDIO_POST_MODES, formData.audioPost.mode)}
+          />
+        </SummaryCard>
+      )}
+
+      {/* BGM 설정 */}
+      <SummaryCard title="06. BGM 설정">
+        {formData.bgm.enabled ? (
+          <>
+            <Row
+              label="분위기"
+              value={findLabel(BGM_MOODS, formData.bgm.mood)}
+            />
+            <Row
+              label="볼륨"
+              value={`${Math.round(formData.bgm.volume * 100)}%`}
+            />
+          </>
+        ) : (
+          <Row label="상태" value="BGM 없음" />
+        )}
+      </SummaryCard>
+
+      {/* 썸네일 */}
+      {formData.thumbnail.enabled && (
+        <SummaryCard title="06-1. AI 썸네일">
+          <Row label="상태" value="AI 자동 생성" />
+        </SummaryCard>
+      )}
+
+      {/* SEO / SNS */}
+      <SummaryCard title="07. SEO & SNS">
+        <Row
+          label="SEO 최적화"
+          value={
+            formData.steps.seo ? (
+              <Badge
+                variant="outline"
+                className="border-green-800 text-green-400 text-[10px]"
+              >
+                자동 최적화
+              </Badge>
+            ) : (
+              "사용 안 함"
+            )
+          }
+        />
+        <Row
+          label="SNS 배포"
+          value={
+            formData.steps.sns ? (
+              <Badge
+                variant="outline"
+                className="border-green-800 text-green-400 text-[10px]"
+              >
+                공유 콘텐츠 자동 생성
+              </Badge>
+            ) : (
+              "사용 안 함"
+            )
+          }
+        />
       </SummaryCard>
     </div>
   );

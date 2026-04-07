@@ -97,6 +97,30 @@ def calculate_scene_durations(
     return [clamped_duration] * scene_count
 
 
+def calculate_scene_durations_with_sync(
+    total_audio_duration: float,
+    scene_count: int,
+    sync_mode: str = "normal",
+    speed_factor: float = 1.0,
+) -> list[float]:
+    """Calculate scene durations with sync mode applied."""
+    if sync_mode == "cut":
+        duration = max(1.0, min(2.0, total_audio_duration / scene_count))
+        return [duration] * scene_count
+    elif sync_mode == "speed":
+        raw = total_audio_duration / scene_count
+        adjusted = raw / speed_factor
+        clamped = max(MIN_IMAGE_DURATION_SECONDS, min(adjusted, MAX_IMAGE_DURATION_SECONDS))
+        return [clamped] * scene_count
+    elif sync_mode == "loop":
+        effective_count = max(1, scene_count // 2)
+        duration = total_audio_duration / effective_count
+        clamped = max(MIN_IMAGE_DURATION_SECONDS, min(duration, MAX_IMAGE_DURATION_SECONDS))
+        return [clamped] * effective_count
+    else:
+        return calculate_scene_durations(total_audio_duration, scene_count)
+
+
 def build_ken_burns_params(
     scene_index: int,
     total_scenes: int,
@@ -214,12 +238,49 @@ def _apply_ken_burns(clip, params: dict, resolution: tuple[int, int]):
     return VideoClip(make_frame, duration=duration).with_fps(clip.fps or DEFAULT_FPS)
 
 
+LOGO_POSITION_MAP = {
+    "top-left": ("left", "top"),
+    "top-right": ("right", "top"),
+    "bottom-left": ("left", "bottom"),
+    "bottom-right": ("right", "bottom"),
+}
+LOGO_SIZE_RATIO = 0.12  # 로고 크기 = 영상 너비의 12%
+LOGO_MARGIN = 20  # 여백 (px)
+
+
+def _download_file(url: str, dest_path: str) -> str:
+    """URL에서 파일을 다운로드하여 dest_path에 저장."""
+    resp = httpx.get(url, timeout=DOWNLOAD_TIMEOUT_SECONDS)
+    resp.raise_for_status()
+    with open(dest_path, "wb") as f:
+        f.write(resp.content)
+    return dest_path
+
+
+def _prepare_logo(logo_path: str, video_width: int) -> str:
+    """로고 이미지를 적절한 크기로 리사이즈."""
+    img = Image.open(logo_path).convert("RGBA")
+    target_w = int(video_width * LOGO_SIZE_RATIO)
+    ratio = target_w / img.width
+    target_h = int(img.height * ratio)
+    img = img.resize((target_w, target_h), Image.LANCZOS)
+    resized_path = logo_path.rsplit(".", 1)[0] + "_resized.png"
+    img.save(resized_path, "PNG")
+    return resized_path
+
+
 @celery_app.task(name="pipeline.compose_video")
 def compose_video_task(
     project_id: int,
     image_urls: list[str | None],
     audio_url: str | None,
     video_type: str = "shorts",
+    sync_mode: str = "normal",
+    speed_factor: float = 1.0,
+    intro_video_url: str | None = None,
+    logo_url: str | None = None,
+    logo_position: str = "top-right",
+    logo_opacity: float = 0.8,
 ) -> dict:
     """이미지와 오디오로 실제 영상을 합성한다.
 
@@ -265,9 +326,11 @@ def compose_video_task(
             audio_duration = audio_clip_tmp.duration
             audio_clip_tmp.close()
 
-        # 3. 장면 duration 계산
+        # 3. 장면 duration 계산 (싱크 모드 적용)
         total_audio = audio_duration or (DEFAULT_IMAGE_DURATION_SECONDS * scene_count)
-        scene_durations = calculate_scene_durations(total_audio, scene_count)
+        scene_durations = calculate_scene_durations_with_sync(
+            total_audio, scene_count, sync_mode, speed_factor
+        )
 
         # 4. 장면 clips 생성
         clips = []
@@ -310,6 +373,39 @@ def compose_video_task(
             if audio_clip.duration > final_video.duration:
                 audio_clip = audio_clip.subclipped(0, final_video.duration)
             final_video = final_video.with_audio(audio_clip)
+
+        # 6-1. 인트로 영상 프리펜드
+        if _is_downloadable_url(intro_video_url):
+            from moviepy import VideoFileClip, concatenate_videoclips as concat_clips
+            intro_path = os.path.join(work_dir, "intro.mp4")
+            _download_file(intro_video_url, intro_path)
+            intro_clip = VideoFileClip(intro_path)
+            # 인트로를 메인 해상도에 맞게 리사이즈
+            intro_clip = intro_clip.resized(resolution)
+            final_video = concat_clips([intro_clip, final_video])
+
+        # 6-2. 로고 오버레이
+        if _is_downloadable_url(logo_url):
+            from moviepy import CompositeVideoClip as CompClip
+            logo_local = os.path.join(work_dir, "logo.png")
+            _download_file(logo_url, logo_local)
+            logo_local = _prepare_logo(logo_local, resolution[0])
+            logo_clip = ImageClip(logo_local).with_duration(final_video.duration)
+
+            h_align, v_align = LOGO_POSITION_MAP.get(
+                logo_position, ("right", "top")
+            )
+            logo_clip = logo_clip.with_opacity(logo_opacity)
+            logo_clip = logo_clip.with_position(
+                (LOGO_MARGIN if h_align == "left" else resolution[0] - int(resolution[0] * LOGO_SIZE_RATIO) - LOGO_MARGIN,
+                 LOGO_MARGIN if v_align == "top" else resolution[1] - logo_clip.size[1] - LOGO_MARGIN)
+            )
+            final_video = CompClip(
+                [final_video, logo_clip], size=resolution
+            ).with_duration(final_video.duration)
+            if final_video.audio is None and audio_path:
+                # CompositeVideoClip이 오디오를 잃을 수 있으므로 복원
+                final_video = final_video.with_audio(AudioFileClip(audio_path))
 
         # 7. 영상 파일 렌더링
         output_path = os.path.join(work_dir, VIDEO_FILENAME)

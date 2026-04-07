@@ -2,6 +2,8 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { FileUpload } from "@/components/ui/file-upload";
+import { supabase } from "@/lib/supabase";
 import {
   VOICE_OPTIONS,
   EMOTIONS,
@@ -12,6 +14,9 @@ import {
   type VoiceConfig,
   type VoiceOption,
 } from "./types";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const AUDIO_MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
 interface StepVoiceProps {
   formData: FormData;
@@ -112,13 +117,16 @@ export function StepVoice({ formData, onChange }: StepVoiceProps) {
         </p>
       </div>
 
-      {/* Enable/Disable toggle */}
+      {/* Voice mode toggle (3 options) */}
       <div className="flex gap-3">
         <button
           type="button"
-          onClick={() => toggleEnabled(true)}
+          onClick={() => {
+            toggleEnabled(true);
+            updateVoice(formData, onChange, { customAudioUrl: "", customAudioName: "" });
+          }}
           className={`flex-1 rounded-lg border p-4 text-left transition-all ${
-            v.enabled
+            v.enabled && !v.customAudioUrl
               ? "border-violet-500/60 bg-violet-950/30"
               : "border-zinc-800 bg-zinc-900/50 hover:border-zinc-700"
           }`}
@@ -128,6 +136,25 @@ export function StepVoice({ formData, onChange }: StepVoiceProps) {
           </div>
           <p className="mt-1 text-xs text-zinc-500">
             대본을 읽는 나레이션 목소리를 생성해요
+          </p>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onChange({
+              voice: { ...formData.voice, enabled: true, customAudioUrl: "pending", customAudioName: "" },
+              steps: { ...formData.steps, tts: false },
+            });
+          }}
+          className={`flex-1 rounded-lg border p-4 text-left transition-all ${
+            v.enabled && v.customAudioUrl
+              ? "border-violet-500/60 bg-violet-950/30"
+              : "border-zinc-800 bg-zinc-900/50 hover:border-zinc-700"
+          }`}
+        >
+          <div className="text-sm font-medium text-zinc-200">음성 업로드</div>
+          <p className="mt-1 text-xs text-zinc-500">
+            직접 녹음한 음성 파일을 사용해요
           </p>
         </button>
         <button
@@ -146,7 +173,58 @@ export function StepVoice({ formData, onChange }: StepVoiceProps) {
         </button>
       </div>
 
-      {v.enabled && (
+      {/* Custom audio upload mode */}
+      {v.enabled && v.customAudioUrl && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-zinc-300">
+            음성 파일 업로드
+          </h3>
+          <p className="text-xs text-zinc-500">
+            MP3, WAV, OGG, M4A 형식을 지원합니다. TTS 단계가 스킵됩니다.
+          </p>
+          <FileUpload
+            accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/x-m4a"
+            maxSize={AUDIO_MAX_SIZE}
+            fileType="audio"
+            placeholder="음성 파일을 드래그하거나 클릭하여 업로드"
+            value={v.customAudioUrl === "pending" ? undefined : v.customAudioUrl}
+            fileName={v.customAudioName}
+            onUpload={async (file) => {
+              const { data: { session } } = await supabase.auth.getSession();
+              const token = session?.access_token;
+              const form = new FormData();
+              form.append("file", file);
+              const res = await fetch(
+                `${API_URL}/api/assets/0/audio`,
+                {
+                  method: "POST",
+                  headers: token ? { Authorization: `Bearer ${token}` } : {},
+                  body: form,
+                },
+              );
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: "업로드 실패" }));
+                throw new Error(err.detail || "업로드에 실패했습니다.");
+              }
+              const data = await res.json();
+              updateVoice(formData, onChange, {
+                customAudioUrl: data.asset_url,
+                customAudioName: file.name,
+              });
+              return data.asset_url;
+            }}
+            onRemove={() => {
+              updateVoice(formData, onChange, {
+                customAudioUrl: "pending",
+                customAudioName: "",
+              });
+            }}
+          />
+        </div>
+      )}
+
+      {/* AI Voice options (only when not in custom audio mode) */}
+      {v.enabled && !v.customAudioUrl && (
         <>
           {/* Voice list */}
           <div className="space-y-3">

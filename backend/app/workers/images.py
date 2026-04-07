@@ -23,12 +23,28 @@ CONSISTENCY_PROMPT_PREFIX = (
 CONSISTENCY_STYLE_REFERENCE = "Match the established style: {style}. "
 
 IMAGE_STYLE_PROMPTS: dict[str, str] = {
+    # 기존 6종
     "realistic": "Photorealistic, high quality photograph, detailed, natural lighting. ",
     "cinematic": "Cinematic style, dramatic lighting, film grain, movie-like composition, widescreen feel. ",
     "anime": "Japanese anime style, vibrant colors, cel shading, manga-inspired illustration. ",
     "watercolor": "Watercolor painting style, soft colors, fluid brushstrokes, artistic. ",
     "3d": "3D rendered, CGI quality, volumetric lighting, modern 3D graphics. ",
     "minimal": "Minimalist design, clean lines, simple shapes, limited color palette, modern. ",
+    # 신규 14종
+    "kwebtoon": "Korean webtoon illustration style, clean lines, vibrant colors, manhwa aesthetic. ",
+    "kwebtoon_realistic": "Korean webtoon realistic style, semi-photorealistic, manhwa aesthetics with realistic proportions. ",
+    "american_comic": "American comic book style, bold ink lines, halftone dots, superhero comic aesthetic. ",
+    "pencil_sketch": "Pencil sketch drawing, graphite on paper, detailed shading, hand-drawn feel. ",
+    "cyberpunk": "Cyberpunk style, neon lights, futuristic city, dark atmosphere, high contrast. ",
+    "clay": "Claymation style, 3D clay figurines, soft lighting, stop-motion animation aesthetic. ",
+    "stopmotion": "Eerie stop-motion style, uncanny valley, textured puppets, Tim Burton inspired. ",
+    "oil_painting": "Classical oil painting style, rich colors, visible brushstrokes, museum quality. ",
+    "pixel_art": "Pixel art style, 8-bit retro game aesthetic, limited color palette, blocky shapes. ",
+    "storybook": "Children's storybook illustration, whimsical, warm colors, fairy tale aesthetic. ",
+    "noir": "Film noir style, black and white, dramatic shadows, high contrast, 1940s detective aesthetic. ",
+    "pop_art": "Pop art style, Andy Warhol inspired, bright colors, bold outlines, Ben-Day dots. ",
+    "pastel": "Soft pastel colors, dreamy atmosphere, gentle gradients, ethereal. ",
+    "vintage": "Vintage film photography, film grain, warm tones, retro color grading, 1970s aesthetic. ",
 }
 
 
