@@ -16,6 +16,11 @@ from app.workers.script import generate_script_task
 from app.workers.subtitle import generate_subtitles_task
 from app.workers.tts import generate_tts_task
 from app.workers.video import compose_video_task
+from app.workers.bgm import add_bgm_task
+from app.workers.thumbnail import generate_thumbnail_task
+from app.workers.audio_postprocess import audio_postprocess_task
+from app.workers.seo import optimize_seo_task
+from app.workers.sns import generate_sns_task
 
 
 def _get_api_key(
@@ -100,10 +105,15 @@ def dispatch_step(
     dispatch_map = {
         "script": _dispatch_script,
         "tts": _dispatch_tts,
+        "audio_post": _dispatch_audio_post,
         "images": _dispatch_images,
         "video": _dispatch_video,
         "subtitle": _dispatch_subtitle,
         "metadata": _dispatch_metadata,
+        "thumbnail": _dispatch_thumbnail,
+        "bgm": _dispatch_bgm,
+        "seo": _dispatch_seo,
+        "sns": _dispatch_sns,
     }
 
     dispatch_fn = dispatch_map[step]
@@ -153,6 +163,18 @@ def _dispatch_tts(
     success_cb, error_cb,
 ):
     voice_cfg = _get_pipeline_sub_config(project, "voice_config")
+
+    # 외부 음성 업로드: TTS 생성을 스킵하고 업로드된 URL을 바로 반환
+    custom_audio_url = voice_cfg.get("custom_audio_url")
+    if custom_audio_url and custom_audio_url != "pending":
+        from app.workers.tts import generate_tts_task
+        return generate_tts_task.apply_async(
+            args=[project_id, "", "custom", None, None],
+            kwargs={"custom_audio_url": custom_audio_url},
+            link=success_cb,
+            link_error=error_cb,
+        )
+
     script_output = prev_outputs.get("script", {})
     scenes = script_output.get("scenes", [])
     narration_text = "\n\n".join(
@@ -192,11 +214,29 @@ def _dispatch_video(
 ):
     images_output = prev_outputs.get("images", {})
     tts_output = prev_outputs.get("tts", {})
+    audio_post_output = prev_outputs.get("audio_post", {})
     image_urls = images_output.get("image_urls", [])
-    audio_url = tts_output.get("audio_url")
+    # 오디오 후처리 결과가 있으면 그것을 사용, 없으면 TTS 원본
+    audio_url = audio_post_output.get("audio_url") or tts_output.get("audio_url")
     video_type = project.get("type", "shorts")
+    video_cfg = _get_pipeline_sub_config(project, "video_config")
+    sync_mode = video_cfg.get("sync_mode", "normal")
+    speed_factor = video_cfg.get("speed_factor", 1.0)
+    intro_cfg = _get_pipeline_sub_config(project, "intro_config")
+    intro_video_url = intro_cfg.get("intro_video_url")
+    logo_url = intro_cfg.get("logo_url")
+    logo_position = intro_cfg.get("logo_position", "top-right")
+    logo_opacity = intro_cfg.get("logo_opacity", 0.8)
     return compose_video_task.apply_async(
         args=[project_id, image_urls, audio_url, video_type],
+        kwargs={
+            "sync_mode": sync_mode,
+            "speed_factor": speed_factor,
+            "intro_video_url": intro_video_url,
+            "logo_url": logo_url,
+            "logo_position": logo_position,
+            "logo_opacity": logo_opacity,
+        },
         link=success_cb,
         link_error=error_cb,
     )
@@ -209,12 +249,12 @@ def _dispatch_subtitle(
     tts_output = prev_outputs.get("tts", {})
     audio_url = tts_output.get("audio_url", "")
     language = config.get("language", "ko")
-    # script 프로바이더: 스크립트 나레이션으로 자막 생성 (무료)
     script_output = prev_outputs.get("script", {})
     scenes = script_output.get("scenes", [])
+    subtitle_cfg = _get_pipeline_sub_config(project, "subtitle_config")
     return generate_subtitles_task.apply_async(
         args=[project_id, audio_url, api_key or "", language],
-        kwargs={"scenes": scenes},
+        kwargs={"scenes": scenes, "subtitle_config": subtitle_cfg},
         link=success_cb,
         link_error=error_cb,
     )
@@ -230,6 +270,94 @@ def _dispatch_metadata(
     language = config.get("language", "ko")
     return generate_metadata_task.apply_async(
         args=[project_id, script_text, video_type, provider, api_key or "", language],
+        link=success_cb,
+        link_error=error_cb,
+    )
+
+
+def _dispatch_audio_post(
+    *, project_id, project, provider, api_key, config, prev_outputs,
+    success_cb, error_cb,
+):
+    audio_post_cfg = _get_pipeline_sub_config(project, "audio_post_config")
+    tts_output = prev_outputs.get("tts", {})
+    audio_url = tts_output.get("audio_url", "")
+    mode = audio_post_cfg.get("mode", "normalize")
+    return audio_postprocess_task.apply_async(
+        args=[project_id, audio_url, mode],
+        link=success_cb,
+        link_error=error_cb,
+    )
+
+
+def _dispatch_thumbnail(
+    *, project_id, project, provider, api_key, config, prev_outputs,
+    success_cb, error_cb,
+):
+    metadata_output = prev_outputs.get("metadata", {})
+    script_output = prev_outputs.get("script", {})
+    title = metadata_output.get("title", "")
+    description = metadata_output.get("description", "")
+    scenes = script_output.get("scenes", [])
+    return generate_thumbnail_task.apply_async(
+        args=[project_id, title, description, scenes, provider, api_key or ""],
+        link=success_cb,
+        link_error=error_cb,
+    )
+
+
+def _dispatch_bgm(
+    *, project_id, project, provider, api_key, config, prev_outputs,
+    success_cb, error_cb,
+):
+    bgm_cfg = _get_pipeline_sub_config(project, "bgm_config")
+    video_output = prev_outputs.get("video", {})
+    video_url = video_output.get("video_url", "")
+    mood = config.get("mood") or bgm_cfg.get("mood", "calm")
+    volume = bgm_cfg.get("volume", 0.15)
+    return add_bgm_task.apply_async(
+        args=[project_id, video_url, mood, provider, api_key or ""],
+        kwargs={"volume": volume},
+        link=success_cb,
+        link_error=error_cb,
+    )
+
+
+def _dispatch_seo(
+    *, project_id, project, provider, api_key, config, prev_outputs,
+    success_cb, error_cb,
+):
+    metadata_output = prev_outputs.get("metadata", {})
+    script_output = prev_outputs.get("script", {})
+    title = metadata_output.get("title", "")
+    description = metadata_output.get("description", "")
+    tags = metadata_output.get("tags", [])
+    script_text = script_output.get("full_text", "")
+    video_type = project.get("type", "shorts")
+    language = config.get("language", "ko")
+    return optimize_seo_task.apply_async(
+        args=[project_id, title, description, tags, script_text, video_type, provider, api_key or "", language],
+        link=success_cb,
+        link_error=error_cb,
+    )
+
+
+def _dispatch_sns(
+    *, project_id, project, provider, api_key, config, prev_outputs,
+    success_cb, error_cb,
+):
+    # Prefer SEO-optimized metadata if available, fallback to original metadata
+    seo_output = prev_outputs.get("seo", {})
+    metadata_output = prev_outputs.get("metadata", {})
+    title = seo_output.get("optimized_title") or metadata_output.get("title", "")
+    description = seo_output.get("optimized_description") or metadata_output.get("description", "")
+    tags = seo_output.get("optimized_tags") or metadata_output.get("tags", [])
+    # Get video URL from bgm (if applied) or original video
+    bgm_output = prev_outputs.get("bgm", {})
+    video_output = prev_outputs.get("video", {})
+    video_url = bgm_output.get("video_url") or video_output.get("video_url")
+    return generate_sns_task.apply_async(
+        args=[project_id, title, description, tags, video_url],
         link=success_cb,
         link_error=error_cb,
     )

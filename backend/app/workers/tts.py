@@ -35,6 +35,38 @@ API_TIMEOUT_SECONDS = 120.0
 AUDIO_FILENAME = "audio.mp3"
 AUDIO_CONTENT_TYPE = "audio/mpeg"
 
+# Edge TTS SSML emotion mapping (mstts:express-as style)
+EDGE_TTS_EMOTIONS: dict[str, str | None] = {
+    "normal": None,
+    "excited": "excited",
+    "happy": "cheerful",
+    "calm": "calm",
+    "whisper": "whispering",
+}
+
+# ElevenLabs emotion → voice_settings tuning
+ELEVENLABS_EMOTION_SETTINGS: dict[str, dict[str, float]] = {
+    "normal": {"stability": 0.5, "similarity_boost": 0.75},
+    "excited": {"stability": 0.3, "similarity_boost": 0.85},
+    "happy": {"stability": 0.4, "similarity_boost": 0.8},
+    "calm": {"stability": 0.7, "similarity_boost": 0.7},
+    "whisper": {"stability": 0.8, "similarity_boost": 0.6},
+}
+
+
+def _wrap_ssml_emotion(text: str, emotion: str, voice: str) -> str:
+    """Wrap text in SSML with emotion style for Edge TTS."""
+    style = EDGE_TTS_EMOTIONS.get(emotion)
+    if not style:
+        return text
+    return (
+        '<speak xmlns="http://www.w3.org/2001/10/synthesis" '
+        'xmlns:mstts="http://www.w3.org/2001/mstts" xml:lang="ko-KR">'
+        f'<voice name="{voice}">'
+        f'<mstts:express-as style="{style}">{text}</mstts:express-as>'
+        '</voice></speak>'
+    )
+
 
 def _get_storage() -> StorageService | None:
     """R2 스토리지 서비스를 환경변수에서 초기화. 설정 없으면 None."""
@@ -66,9 +98,13 @@ def build_tts_request(
     provider: str,
     api_key: str,
     voice_id: str | None = None,
+    emotion: str = "normal",
 ) -> dict:
     if provider == "elevenlabs":
         vid = voice_id or ELEVENLABS_DEFAULT_VOICE_ID
+        voice_settings = ELEVENLABS_EMOTION_SETTINGS.get(
+            emotion, ELEVENLABS_EMOTION_SETTINGS["normal"]
+        )
         return {
             "url": f"https://api.elevenlabs.io/v1/text-to-speech/{vid}",
             "headers": {
@@ -78,10 +114,7 @@ def build_tts_request(
             "json": {
                 "text": text,
                 "model_id": "eleven_multilingual_v2",
-                "voice_settings": {
-                    "stability": 0.5,
-                    "similarity_boost": 0.75,
-                },
+                "voice_settings": voice_settings,
             },
         }
     elif provider == "openai":
@@ -174,11 +207,22 @@ def generate_tts_task(
     voice_id: str | None = None,
     speed: float = 1.0,
     emotion: str = "normal",
+    custom_audio_url: str | None = None,
 ) -> dict:
+    # 외부 음성 업로드: TTS 생성 스킵, 업로드된 URL을 그대로 반환
+    if provider == "custom" and custom_audio_url:
+        return {
+            "audio_url": custom_audio_url,
+            "audio_size": 0,
+            "chunk_count": 0,
+            "provider": "custom",
+        }
+
     # Edge TTS: 로컬 라이브러리 직접 호출 (API 키 불필요)
     if provider == "edgetts":
         voice = voice_id or EDGE_TTS_DEFAULT_VOICE
-        audio_data = _generate_edge_tts(text, voice, speed=speed)
+        tts_text = _wrap_ssml_emotion(text, emotion, voice)
+        audio_data = _generate_edge_tts(tts_text, voice, speed=speed)
         audio_url = _upload_audio(project_id, audio_data)
         return {
             "audio_url": audio_url,
@@ -192,7 +236,7 @@ def generate_tts_task(
     audio_parts: list[bytes] = []
 
     for chunk in chunks:
-        request = build_tts_request(chunk, provider, api_key or "", voice_id)
+        request = build_tts_request(chunk, provider, api_key or "", voice_id, emotion)
         # OpenAI TTS: speed 파라미터 지원
         if provider == "openai" and request and speed != 1.0:
             request["json"]["speed"] = speed

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.routers import api_keys, pipeline, projects, users
+from app.routers import api_keys, assets, pipeline, projects, users
 from app.services.storage import MEDIA_ROOT
 
 app = FastAPI(title="AutoTube API", version="0.1.0")
@@ -24,6 +24,7 @@ app.add_middleware(
 
 
 app.include_router(api_keys.router)
+app.include_router(assets.router)
 app.include_router(pipeline.router)
 app.include_router(projects.router)
 app.include_router(users.router)

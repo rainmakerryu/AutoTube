@@ -1,19 +1,24 @@
 from __future__ import annotations
 
-STEP_ORDER = ["script", "tts", "images", "video", "subtitle", "metadata"]
+STEP_ORDER = ["script", "tts", "audio_post", "images", "video", "bgm", "subtitle", "metadata", "thumbnail", "seo", "sns"]
 REQUIRED_STEPS = {"video"}
 
 # 기본 검토 대상 단계 (pipeline_config.review_steps 로 오버라이드 가능)
-DEFAULT_REVIEW_STEPS = {"script", "images", "metadata"}
+DEFAULT_REVIEW_STEPS = {"script", "images", "metadata", "seo"}
 
 # 단계별 사용 가능한 프로바이더
 STEP_PROVIDERS: dict[str, list[str]] = {
-    "script":   ["openai", "claude", "deepseek", "ollama"],
-    "tts":      ["elevenlabs", "openai", "edgetts"],
-    "images":   ["gemini", "openai", "pexels", "comfyui"],
-    "video":    [],
-    "subtitle": ["openai", "script"],
-    "metadata": ["openai", "claude", "deepseek", "ollama"],
+    "script":     ["openai", "claude", "deepseek", "ollama"],
+    "tts":        ["elevenlabs", "openai", "edgetts"],
+    "audio_post": ["local"],
+    "images":     ["gemini", "openai", "pexels", "comfyui"],
+    "video":      [],
+    "subtitle":   ["openai", "script"],
+    "metadata":   ["openai", "claude", "deepseek", "ollama"],
+    "thumbnail":  ["openai", "gemini"],
+    "bgm":        ["library"],
+    "seo":        ["openai", "claude", "deepseek", "ollama"],
+    "sns":        ["manual"],
 }
 
 STEP_INPUT_MAP = {
@@ -22,6 +27,9 @@ STEP_INPUT_MAP = {
     "images": "이미지 파일들을 업로드하세요",
     "subtitle": "자막 파일(SRT)을 업로드하세요",
     "metadata": "제목, 설명, 태그를 직접 입력하세요",
+    "bgm": "배경 음악 파일(MP3)을 업로드하세요",
+    "seo": "SEO 키워드를 직접 입력하세요",
+    "sns": "SNS 배포 내용을 직접 입력하세요",
 }
 
 
