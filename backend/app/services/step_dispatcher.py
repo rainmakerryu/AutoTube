@@ -167,7 +167,6 @@ def _dispatch_tts(
     # 외부 음성 업로드: TTS 생성을 스킵하고 업로드된 URL을 바로 반환
     custom_audio_url = voice_cfg.get("custom_audio_url")
     if custom_audio_url and custom_audio_url != "pending":
-        from app.workers.tts import generate_tts_task
         return generate_tts_task.apply_async(
             args=[project_id, "", "custom", None, None],
             kwargs={"custom_audio_url": custom_audio_url},
