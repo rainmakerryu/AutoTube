@@ -34,7 +34,14 @@ export async function apiClient(path: string, options: RequestInit = {}) {
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({ detail: res.statusText }));
-      throw new Error(errorData.detail || `API request failed with status ${res.status}`);
+      const detail = errorData.detail;
+      const message =
+        typeof detail === "string"
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((d: { msg?: string }) => d.msg ?? JSON.stringify(d)).join("; ")
+            : `API request failed with status ${res.status}`;
+      throw new Error(message);
     }
 
     return await res.json();

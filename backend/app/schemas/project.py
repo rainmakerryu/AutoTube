@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -7,7 +8,7 @@ class ProjectCreate(BaseModel):
     title: str
     type: str
     topic: str
-    pipeline_config: dict[str, bool]
+    pipeline_config: dict
 
 
 class ProjectResponse(BaseModel):
@@ -17,8 +18,8 @@ class ProjectResponse(BaseModel):
     topic: str
     status: str
     pipeline_config: dict
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -28,6 +29,6 @@ class ProjectListResponse(BaseModel):
     title: str
     type: str
     status: str
-    created_at: datetime | None = None
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
