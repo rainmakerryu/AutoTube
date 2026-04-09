@@ -3,9 +3,10 @@
 ComfyUI runs a local server (default http://127.0.0.1:8188) with async workflow execution:
   1. POST /prompt — submit workflow, get prompt_id
   2. GET /history/{prompt_id} — poll until completion
-  3. GET /view — download generated image
+  3. GET /view — download generated image/video
   4. POST /upload/image — upload reference image for IP-Adapter
 """
+from __future__ import annotations
 
 import time
 
@@ -15,9 +16,11 @@ COMFYUI_DEFAULT_URL = "http://127.0.0.1:8188"
 POLL_INITIAL_INTERVAL = 1.0
 POLL_MAX_INTERVAL = 5.0
 POLL_TIMEOUT = 300.0
+VIDEO_POLL_TIMEOUT = 600.0
 HEALTH_TIMEOUT = 5.0
 SUBMIT_TIMEOUT = 30.0
 DOWNLOAD_TIMEOUT = 60.0
+VIDEO_DOWNLOAD_TIMEOUT = 120.0
 
 
 class ComfyUIError(Exception):
@@ -165,6 +168,58 @@ def download_comfyui_image(
             f"ComfyUI 이미지 다운로드 실패: filename={filename}, "
             f"오류: {exc}"
         ) from exc
+
+
+def download_comfyui_video(
+    base_url: str,
+    filename: str,
+    subfolder: str = "",
+    vid_type: str = "output",
+) -> bytes:
+    """Download a generated video from ComfyUI's /view endpoint.
+
+    Same as download_comfyui_image but with a longer timeout for video files.
+    Returns raw video bytes.
+    Raises ComfyUIError if download fails.
+    """
+    base_url = _normalize_url(base_url)
+    params = {"filename": filename, "type": vid_type}
+    if subfolder:
+        params["subfolder"] = subfolder
+
+    try:
+        response = httpx.get(
+            f"{base_url}/view",
+            params=params,
+            timeout=VIDEO_DOWNLOAD_TIMEOUT,
+        )
+        response.raise_for_status()
+        return response.content
+    except httpx.HTTPError as exc:
+        raise ComfyUIError(
+            f"ComfyUI 영상 다운로드 실패: filename={filename}, "
+            f"오류: {exc}"
+        ) from exc
+
+
+def extract_video_output(outputs: dict) -> dict | None:
+    """Extract video file info from ComfyUI workflow outputs.
+
+    VHS_VideoCombine stores results under the "gifs" key (despite the name,
+    it contains MP4 info): {"gifs": [{"filename": "...", "subfolder": "", "type": "output"}]}
+
+    Returns {"filename": str, "subfolder": str, "type": str} or None if not found.
+    """
+    for node_id, node_output in outputs.items():
+        gifs = node_output.get("gifs")
+        if gifs and len(gifs) > 0:
+            entry = gifs[0]
+            return {
+                "filename": entry.get("filename", ""),
+                "subfolder": entry.get("subfolder", ""),
+                "type": entry.get("type", "output"),
+            }
+    return None
 
 
 def upload_reference_image(

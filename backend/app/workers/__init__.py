@@ -6,6 +6,7 @@ from app.workers import script  # noqa: F401
 from app.workers import tts  # noqa: F401
 from app.workers import images  # noqa: F401
 from app.workers import video  # noqa: F401
+from app.workers import video_gen  # noqa: F401
 from app.workers import subtitle  # noqa: F401
 from app.workers import metadata  # noqa: F401
 from app.workers import bgm  # noqa: F401

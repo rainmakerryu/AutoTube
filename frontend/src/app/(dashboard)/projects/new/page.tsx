@@ -100,6 +100,15 @@ function buildPipelineConfig(formData: FormData): Record<string, unknown> {
     style: formData.imageStyle.style,
   };
 
+  // video generation config (ComfyUI AI video clips)
+  if (formData.imageStyle.videoGenMode !== "none") {
+    config.video_gen = true;
+    config.video_gen_config = {
+      gen_mode: formData.imageStyle.videoGenMode,
+      model: formData.imageStyle.videoGenModel,
+    };
+  }
+
   // voice config
   config.voice_config = {
     enabled: formData.voice.enabled,

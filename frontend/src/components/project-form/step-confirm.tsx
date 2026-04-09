@@ -5,6 +5,8 @@ import {
   VIDEO_TYPES,
   IMAGE_PROVIDERS,
   IMAGE_STYLES,
+  VIDEO_GEN_MODES,
+  VIDEO_GEN_MODELS,
   VOICE_OPTIONS,
   EMOTIONS,
   LANGUAGES,
@@ -159,6 +161,18 @@ export function StepConfirm({ formData }: StepConfirmProps) {
           }
         />
         <Row label="스타일" value={imageStyle?.name ?? img.style} />
+        {img.videoGenMode !== "none" && (
+          <>
+            <Row
+              label="AI 영상"
+              value={findLabel(VIDEO_GEN_MODES, img.videoGenMode)}
+            />
+            <Row
+              label="모델"
+              value={findLabel(VIDEO_GEN_MODELS, img.videoGenModel)}
+            />
+          </>
+        )}
       </SummaryCard>
 
       {/* AI 보이스 */}

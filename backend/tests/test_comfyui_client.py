@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -7,6 +9,8 @@ from app.workers.comfyui_client import (
     submit_workflow,
     poll_comfyui_result,
     download_comfyui_image,
+    download_comfyui_video,
+    extract_video_output,
     upload_reference_image,
     ComfyUIError,
     COMFYUI_DEFAULT_URL,
@@ -159,3 +163,86 @@ class TestUploadReferenceImage:
                 upload_reference_image(
                     COMFYUI_DEFAULT_URL, b"\x89PNG", "ref.png"
                 )
+
+
+class TestDownloadVideo:
+    def test_download_video_success(self):
+        mock_response = MagicMock()
+        mock_response.content = b"\x00\x00\x00\x1cftypisom"
+        mock_response.raise_for_status = MagicMock()
+
+        with patch("app.workers.comfyui_client.httpx.get", return_value=mock_response):
+            data = download_comfyui_video(COMFYUI_DEFAULT_URL, "video.mp4")
+            assert data == b"\x00\x00\x00\x1cftypisom"
+
+    def test_download_video_failure(self):
+        import httpx
+
+        with patch(
+            "app.workers.comfyui_client.httpx.get",
+            side_effect=httpx.ConnectError("Connection refused"),
+        ):
+            with pytest.raises(ComfyUIError, match="영상 다운로드 실패"):
+                download_comfyui_video(COMFYUI_DEFAULT_URL, "video.mp4")
+
+
+class TestExtractVideoOutput:
+    def test_normal_output(self):
+        outputs = {
+            "10": {
+                "gifs": [
+                    {"filename": "autotube_video_00001.mp4", "subfolder": "", "type": "output"}
+                ]
+            }
+        }
+        result = extract_video_output(outputs)
+        assert result is not None
+        assert result["filename"] == "autotube_video_00001.mp4"
+        assert result["subfolder"] == ""
+        assert result["type"] == "output"
+
+    def test_with_subfolder(self):
+        outputs = {
+            "5": {
+                "gifs": [
+                    {"filename": "video.mp4", "subfolder": "videos", "type": "output"}
+                ]
+            }
+        }
+        result = extract_video_output(outputs)
+        assert result is not None
+        assert result["subfolder"] == "videos"
+
+    def test_empty_outputs(self):
+        assert extract_video_output({}) is None
+
+    def test_image_only_outputs(self):
+        outputs = {
+            "7": {
+                "images": [
+                    {"filename": "image.png", "subfolder": "", "type": "output"}
+                ]
+            }
+        }
+        assert extract_video_output(outputs) is None
+
+    def test_empty_gifs_list(self):
+        outputs = {"10": {"gifs": []}}
+        assert extract_video_output(outputs) is None
+
+    def test_multiple_nodes_finds_gifs(self):
+        outputs = {
+            "5": {"images": [{"filename": "preview.png"}]},
+            "10": {"gifs": [{"filename": "final.mp4", "subfolder": "", "type": "output"}]},
+        }
+        result = extract_video_output(outputs)
+        assert result is not None
+        assert result["filename"] == "final.mp4"
+
+    def test_missing_optional_keys(self):
+        outputs = {"10": {"gifs": [{"filename": "video.mp4"}]}}
+        result = extract_video_output(outputs)
+        assert result is not None
+        assert result["filename"] == "video.mp4"
+        assert result["subfolder"] == ""
+        assert result["type"] == "output"

@@ -20,6 +20,7 @@ export type ScriptMode = "basic" | "ai" | "manual";
 export const LANGUAGES = [
   { id: "ko", label: "한국어" },
   { id: "en", label: "영어" },
+  { id: "ja", label: "일본어" },
 ] as const;
 
 export const PURPOSES = [
@@ -78,6 +79,22 @@ export const IMAGE_STYLES = [
   { id: "pop_art", name: "팝 아트", description: "워홀 스타일 팝 아트" },
   { id: "pastel", name: "파스텔", description: "부드러운 파스텔 톤" },
   { id: "vintage", name: "빈티지", description: "레트로 빈티지 필름" },
+] as const;
+
+// ── Video Generation (ComfyUI) ────────────────────────────
+export type VideoGenMode = "none" | "img2vid" | "txt2vid";
+
+export const VIDEO_GEN_MODES = [
+  { id: "none" as const, name: "이미지만", description: "정적 이미지 + Ken Burns 효과" },
+  { id: "img2vid" as const, name: "이미지 -> 영상", description: "이미지를 AI 영상 클립으로 변환" },
+  { id: "txt2vid" as const, name: "텍스트 -> 영상", description: "텍스트에서 직접 AI 영상 생성" },
+] as const;
+
+export const VIDEO_GEN_MODELS = [
+  { id: "animatediff", name: "AnimateDiff", modes: ["img2vid"], description: "빠른 모션 (~2초)" },
+  { id: "svd", name: "SVD", modes: ["img2vid"], description: "고품질 애니메이션 (~4초)" },
+  { id: "wan21", name: "Wan2.1", modes: ["img2vid", "txt2vid"], description: "고품질 AI 비디오 (~5초)" },
+  { id: "cogvideox", name: "CogVideoX", modes: ["img2vid", "txt2vid"], description: "텍스트/이미지 -> 영상 (~6초)" },
 ] as const;
 
 // ── Voice ──────────────────────────────────────────────────
@@ -145,6 +162,8 @@ export interface ScriptConfig {
 export interface ImageConfig {
   provider: string;
   style: string;
+  videoGenMode: VideoGenMode;
+  videoGenModel: string;
 }
 
 export interface VoiceConfig {
@@ -316,6 +335,8 @@ export const DEFAULT_FORM_DATA: FormData = {
   imageStyle: {
     provider: "pexels",
     style: "cinematic",
+    videoGenMode: "none",
+    videoGenModel: "animatediff",
   },
   voice: {
     enabled: true,
@@ -364,6 +385,7 @@ export const DEFAULT_FORM_DATA: FormData = {
     tts: true,
     audio_post: false,
     images: true,
+    video_gen: false,
     video: true,
     bgm: true,
     subtitle: true,

@@ -16,6 +16,7 @@ from app.workers.script import generate_script_task
 from app.workers.subtitle import generate_subtitles_task
 from app.workers.tts import generate_tts_task
 from app.workers.video import compose_video_task
+from app.workers.video_gen import generate_video_clips_task
 from app.workers.bgm import add_bgm_task
 from app.workers.thumbnail import generate_thumbnail_task
 from app.workers.audio_postprocess import audio_postprocess_task
@@ -107,6 +108,7 @@ def dispatch_step(
         "tts": _dispatch_tts,
         "audio_post": _dispatch_audio_post,
         "images": _dispatch_images,
+        "video_gen": _dispatch_video_gen,
         "video": _dispatch_video,
         "subtitle": _dispatch_subtitle,
         "metadata": _dispatch_metadata,
@@ -207,6 +209,29 @@ def _dispatch_images(
     )
 
 
+def _dispatch_video_gen(
+    *, project_id, project, provider, api_key, config, prev_outputs,
+    success_cb, error_cb,
+):
+    video_gen_cfg = _get_pipeline_sub_config(project, "video_gen_config")
+    gen_mode = video_gen_cfg.get("gen_mode", "img2vid")
+    model = video_gen_cfg.get("model", "animatediff")
+    images_output = prev_outputs.get("images", {})
+    image_urls = images_output.get("image_urls", [])
+    script_output = prev_outputs.get("script", {})
+    scenes = script_output.get("scenes", [])
+    video_type = project.get("type", "shorts")
+    image_cfg = _get_pipeline_sub_config(project, "image_config")
+    style = image_cfg.get("style", "")
+    return generate_video_clips_task.apply_async(
+        args=[project_id, scenes, image_urls, api_key or "", video_type,
+              gen_mode, model],
+        kwargs={"style": style},
+        link=success_cb,
+        link_error=error_cb,
+    )
+
+
 def _dispatch_video(
     *, project_id, project, provider, api_key, config, prev_outputs,
     success_cb, error_cb,
@@ -214,7 +239,9 @@ def _dispatch_video(
     images_output = prev_outputs.get("images", {})
     tts_output = prev_outputs.get("tts", {})
     audio_post_output = prev_outputs.get("audio_post", {})
+    video_gen_output = prev_outputs.get("video_gen", {})
     image_urls = images_output.get("image_urls", [])
+    video_clip_urls = video_gen_output.get("video_clip_urls")
     # 오디오 후처리 결과가 있으면 그것을 사용, 없으면 TTS 원본
     audio_url = audio_post_output.get("audio_url") or tts_output.get("audio_url")
     video_type = project.get("type", "shorts")
@@ -231,6 +258,7 @@ def _dispatch_video(
         kwargs={
             "sync_mode": sync_mode,
             "speed_factor": speed_factor,
+            "video_clip_urls": video_clip_urls,
             "intro_video_url": intro_video_url,
             "logo_url": logo_url,
             "logo_position": logo_position,
@@ -251,9 +279,17 @@ def _dispatch_subtitle(
     script_output = prev_outputs.get("script", {})
     scenes = script_output.get("scenes", [])
     subtitle_cfg = _get_pipeline_sub_config(project, "subtitle_config")
+    # BGM 적용된 영상 우선, 없으면 원본 영상 URL
+    bgm_output = prev_outputs.get("bgm", {})
+    video_output = prev_outputs.get("video", {})
+    video_url = bgm_output.get("video_url") or video_output.get("video_url")
     return generate_subtitles_task.apply_async(
         args=[project_id, audio_url, api_key or "", language],
-        kwargs={"scenes": scenes, "subtitle_config": subtitle_cfg},
+        kwargs={
+            "scenes": scenes,
+            "subtitle_config": subtitle_cfg,
+            "video_url": video_url,
+        },
         link=success_cb,
         link_error=error_cb,
     )

@@ -43,6 +43,9 @@ const STEP_PROVIDERS: Record<string, ProviderOption[]> = {
   audio_post: [
     { id: "local", name: "로컬 후처리 (무료)", models: ["pydub+ffmpeg"], free: true },
   ],
+  video_gen: [
+    { id: "comfyui", name: "ComfyUI (로컬)", models: ["AnimateDiff", "SVD", "Wan2.1", "CogVideoX"], free: true },
+  ],
   video: [],
   subtitle: [
     { id: "openai", name: "Whisper", models: ["whisper-1"] },
@@ -77,6 +80,7 @@ const STEP_LABELS: Record<string, string> = {
   tts: "음성 생성 (TTS)",
   audio_post: "오디오 후처리",
   images: "이미지 생성",
+  video_gen: "AI 영상 생성",
   video: "영상 합성",
   subtitle: "자막 생성",
   metadata: "메타데이터 생성",
