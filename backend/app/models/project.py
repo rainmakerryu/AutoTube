@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import String, DateTime, Integer, JSON, ForeignKey, func, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -35,12 +36,12 @@ class PipelineStep(Base):
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
     step: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, default="pending")
-    input_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    output_url: Mapped[str | None] = mapped_column(String, nullable=True)
-    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    input_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    output_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     project: Mapped["Project"] = relationship(back_populates="steps")
 
@@ -53,8 +54,8 @@ class Asset(Base):
     step: Mapped[str] = mapped_column(String, nullable=False)
     type: Mapped[str] = mapped_column(String, nullable=False)
     storage_url: Mapped[str] = mapped_column(String, nullable=False)
-    file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    mime_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    file_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    mime_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     project: Mapped["Project"] = relationship(back_populates="assets")

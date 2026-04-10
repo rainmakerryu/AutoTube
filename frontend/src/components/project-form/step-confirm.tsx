@@ -72,7 +72,9 @@ export function StepConfirm({ formData }: StepConfirmProps) {
       ? "기본 설정 (AI 자동)"
       : s.mode === "ai"
         ? "AI로 작성하기"
-        : "직접 입력";
+        : s.mode === "url"
+          ? "URL로 만들기"
+          : "직접 입력";
 
   return (
     <div className="space-y-6">
@@ -127,6 +129,20 @@ export function StepConfirm({ formData }: StepConfirmProps) {
             {s.closingComment && (
               <Row label="클로징" value={s.closingComment} />
             )}
+          </>
+        )}
+        {s.mode === "url" && s.sourceUrl && (
+          <>
+            <Row
+              label="URL"
+              value={
+                <span className="max-w-[260px] truncate inline-block">
+                  {s.sourceUrl}
+                </span>
+              }
+            />
+            <Row label="언어" value={findLabel(LANGUAGES, s.language)} />
+            <Row label="톤" value={findLabel(TONES, s.tone)} />
           </>
         )}
         {s.mode === "manual" && s.manualScript && (

@@ -12,10 +12,16 @@ export const VIDEO_TYPES = [
     description: "5-15분 가로 영상",
     ratio: "16:9",
   },
+  {
+    value: "square" as const,
+    label: "Square",
+    description: "Instagram/Facebook 정사각 영상",
+    ratio: "1:1",
+  },
 ];
 
 // ── Script Settings ────────────────────────────────────────
-export type ScriptMode = "basic" | "ai" | "manual";
+export type ScriptMode = "basic" | "ai" | "manual" | "url";
 
 export const LANGUAGES = [
   { id: "ko", label: "한국어" },
@@ -157,6 +163,7 @@ export interface ScriptConfig {
   requiredInfo: string;
   referenceScript: string;
   manualScript: string;
+  sourceUrl: string;
 }
 
 export interface ImageConfig {
@@ -331,6 +338,7 @@ export const DEFAULT_FORM_DATA: FormData = {
     requiredInfo: "",
     referenceScript: "",
     manualScript: "",
+    sourceUrl: "",
   },
   imageStyle: {
     provider: "pexels",
@@ -393,6 +401,7 @@ export const DEFAULT_FORM_DATA: FormData = {
     thumbnail: false,
     seo: true,
     sns: true,
+    youtube_upload: false,
   },
 };
 

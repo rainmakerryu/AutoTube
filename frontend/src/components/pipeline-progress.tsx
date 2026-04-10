@@ -16,6 +16,7 @@ import {
   Share2,
   SlidersHorizontal,
   ImagePlus,
+  Upload,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,7 @@ const STEP_CONFIG: Record<string, { label: string; icon: React.ComponentType<{ c
   bgm: { label: "BGM", icon: Music },
   seo: { label: "SEO", icon: Search },
   sns: { label: "SNS", icon: Share2 },
+  youtube_upload: { label: "YouTube 업로드", icon: Upload },
 };
 
 const STATUS_LABELS: Record<string, string> = {

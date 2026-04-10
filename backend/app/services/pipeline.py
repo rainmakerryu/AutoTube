@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-STEP_ORDER = ["script", "tts", "audio_post", "images", "video_gen", "video", "bgm", "subtitle", "metadata", "thumbnail", "seo", "sns"]
+STEP_ORDER = ["script", "tts", "audio_post", "images", "video_gen", "video", "bgm", "subtitle", "metadata", "thumbnail", "seo", "sns", "youtube_upload"]
 REQUIRED_STEPS = {"video"}
 
 # 기본 검토 대상 단계 (pipeline_config.review_steps 로 오버라이드 가능)
@@ -20,6 +20,7 @@ STEP_PROVIDERS: dict[str, list[str]] = {
     "bgm":        ["library"],
     "seo":        ["openai", "claude", "deepseek", "ollama"],
     "sns":        ["manual"],
+    "youtube_upload": ["youtube"],
 }
 
 STEP_INPUT_MAP = {

@@ -73,6 +73,9 @@ const STEP_PROVIDERS: Record<string, ProviderOption[]> = {
   sns: [
     { id: "manual", name: "직접 배포 (무료)", models: ["share-text"], free: true },
   ],
+  youtube_upload: [
+    { id: "youtube", name: "YouTube API", models: ["upload-v3"], free: true },
+  ],
 };
 
 const STEP_LABELS: Record<string, string> = {
@@ -88,6 +91,7 @@ const STEP_LABELS: Record<string, string> = {
   bgm: "배경 음악 (BGM)",
   seo: "SEO 최적화",
   sns: "SNS 배포",
+  youtube_upload: "YouTube 업로드",
 };
 
 interface StepConfigPanelProps {

@@ -9,6 +9,7 @@ from app.workers.comfyui_client import COMFYUI_DEFAULT_URL
 
 SHORTS_IMAGE_SIZE = "1024x1792"
 LONGFORM_IMAGE_SIZE = "1792x1024"
+SQUARE_IMAGE_SIZE = "1024x1024"
 PEXELS_IMAGE_SIZE = "large"
 API_TIMEOUT_SECONDS = 120.0
 MAX_IMAGES_PER_PROJECT = 30
@@ -117,8 +118,12 @@ def build_image_generation_request(
 
     Returns dict with url, headers, json/params, method keys.
     """
-    is_shorts = video_type == "shorts"
-    image_size = SHORTS_IMAGE_SIZE if is_shorts else LONGFORM_IMAGE_SIZE
+    IMAGE_SIZE_MAP = {
+        "shorts": SHORTS_IMAGE_SIZE,
+        "long": LONGFORM_IMAGE_SIZE,
+        "square": SQUARE_IMAGE_SIZE,
+    }
+    image_size = IMAGE_SIZE_MAP.get(video_type, LONGFORM_IMAGE_SIZE)
 
     if provider == "gemini":
         return {
@@ -211,7 +216,12 @@ def parse_image_response(provider: str, response_json: dict) -> str | None:
 
 def _parse_comfyui_dimensions(video_type: str) -> tuple[int, int]:
     """Convert video type to (width, height) for ComfyUI."""
-    size_str = SHORTS_IMAGE_SIZE if video_type == "shorts" else LONGFORM_IMAGE_SIZE
+    SIZE_MAP = {
+        "shorts": SHORTS_IMAGE_SIZE,
+        "long": LONGFORM_IMAGE_SIZE,
+        "square": SQUARE_IMAGE_SIZE,
+    }
+    size_str = SIZE_MAP.get(video_type, LONGFORM_IMAGE_SIZE)
     w, h = size_str.split("x")
     return int(w), int(h)
 

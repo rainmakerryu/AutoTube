@@ -22,6 +22,7 @@ from app.workers.thumbnail import generate_thumbnail_task
 from app.workers.audio_postprocess import audio_postprocess_task
 from app.workers.seo import optimize_seo_task
 from app.workers.sns import generate_sns_task
+from app.workers.youtube_upload import youtube_upload_task
 
 
 def _get_api_key(
@@ -116,6 +117,7 @@ def dispatch_step(
         "bgm": _dispatch_bgm,
         "seo": _dispatch_seo,
         "sns": _dispatch_sns,
+        "youtube_upload": _dispatch_youtube_upload,
     }
 
     dispatch_fn = dispatch_map[step]
@@ -393,6 +395,51 @@ def _dispatch_sns(
     video_url = bgm_output.get("video_url") or video_output.get("video_url")
     return generate_sns_task.apply_async(
         args=[project_id, title, description, tags, video_url],
+        link=success_cb,
+        link_error=error_cb,
+    )
+
+
+def _dispatch_youtube_upload(
+    *, project_id, project, provider, api_key, config, prev_outputs,
+    success_cb, error_cb,
+):
+    youtube_cfg = _get_pipeline_sub_config(project, "youtube_config")
+    seo_output = prev_outputs.get("seo", {})
+    metadata_output = prev_outputs.get("metadata", {})
+    thumbnail_output = prev_outputs.get("thumbnail", {})
+
+    # 최종 영상 URL (자막 → BGM → 원본 순)
+    subtitle_output = prev_outputs.get("subtitle", {})
+    bgm_output = prev_outputs.get("bgm", {})
+    video_output = prev_outputs.get("video", {})
+    video_url = (
+        subtitle_output.get("video_url")
+        or bgm_output.get("video_url")
+        or video_output.get("video_url", "")
+    )
+
+    title = seo_output.get("optimized_title") or metadata_output.get("title", "")
+    description = seo_output.get("optimized_description") or metadata_output.get("description", "")
+    tags = seo_output.get("optimized_tags") or metadata_output.get("tags", [])
+    thumbnail_url = thumbnail_output.get("thumbnail_url")
+
+    privacy = youtube_cfg.get("privacy", "private")
+    category = youtube_cfg.get("category", "people")
+    language = youtube_cfg.get("language", "ko")
+    scheduled_at = youtube_cfg.get("scheduled_at")
+
+    return youtube_upload_task.apply_async(
+        args=[project_id, video_url, api_key or "", title],
+        kwargs={
+            "description": description,
+            "tags": tags,
+            "privacy": privacy,
+            "category": category,
+            "language": language,
+            "thumbnail_url": thumbnail_url,
+            "scheduled_at": scheduled_at,
+        },
         link=success_cb,
         link_error=error_cb,
     )

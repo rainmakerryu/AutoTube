@@ -74,7 +74,19 @@ function buildPipelineConfig(formData: FormData): Record<string, unknown> {
   const config: Record<string, unknown> = { ...formData.steps };
 
   // script config
-  if (formData.script.mode !== "manual") {
+  if (formData.script.mode === "manual") {
+    config.script_config = {
+      mode: "manual",
+      manual_script: formData.script.manualScript,
+    };
+  } else if (formData.script.mode === "url") {
+    config.script_config = {
+      mode: "url",
+      source_url: formData.script.sourceUrl,
+      language: formData.script.language,
+      tone: formData.script.tone,
+    };
+  } else {
     config.script_config = {
       mode: formData.script.mode,
       language: formData.script.language,
@@ -86,11 +98,6 @@ function buildPipelineConfig(formData: FormData): Record<string, unknown> {
       product_name: formData.script.productName,
       required_info: formData.script.requiredInfo,
       reference_script: formData.script.referenceScript,
-    };
-  } else {
-    config.script_config = {
-      mode: "manual",
-      manual_script: formData.script.manualScript,
     };
   }
 
@@ -187,11 +194,14 @@ function NewProjectInner() {
   const hasTitle = formData.script.title.trim().length > 0;
   const hasTopic = formData.script.topic.trim().length > 0;
   const hasManualScript = formData.script.manualScript.trim().length > 0;
+  const hasSourceUrl = formData.script.sourceUrl.trim().length > 0;
 
   const isScriptStepValid =
     formData.script.mode === "manual"
       ? hasTitle && hasManualScript
-      : hasTitle && hasTopic;
+      : formData.script.mode === "url"
+        ? hasTitle && hasSourceUrl
+        : hasTitle && hasTopic;
 
   const canProceed =
     step === 0 ||

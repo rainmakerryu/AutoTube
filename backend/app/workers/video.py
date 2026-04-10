@@ -19,6 +19,7 @@ from app.services.storage import (
 
 SHORTS_RESOLUTION = (1080, 1920)
 LONGFORM_RESOLUTION = (1920, 1080)
+SQUARE_RESOLUTION = (1080, 1080)
 DEFAULT_FPS = 30
 DEFAULT_IMAGE_DURATION_SECONDS = 5.0
 MIN_IMAGE_DURATION_SECONDS = 2.0
@@ -63,10 +64,10 @@ def validate_inputs(
                 f"지원 형식: {', '.join(sorted(SUPPORTED_AUDIO_FORMATS))}"
             )
 
-    if video_type not in ("shorts", "longform"):
+    if video_type not in ("shorts", "longform", "square"):
         errors.append(
             f"지원하지 않는 video_type입니다: '{video_type}'. "
-            "'shorts' 또는 'longform'을 사용하세요."
+            "'shorts', 'longform' 또는 'square'를 사용하세요."
         )
 
     return errors
@@ -78,9 +79,11 @@ def get_resolution(video_type: str) -> tuple[int, int]:
         return SHORTS_RESOLUTION
     elif video_type == "longform":
         return LONGFORM_RESOLUTION
+    elif video_type == "square":
+        return SQUARE_RESOLUTION
     raise ValueError(
         f"지원하지 않는 video_type입니다: '{video_type}'. "
-        "'shorts' 또는 'longform'을 사용하세요."
+        "'shorts', 'longform' 또는 'square'를 사용하세요."
     )
 
 

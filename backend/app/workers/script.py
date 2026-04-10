@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import re
+
 import httpx
+from bs4 import BeautifulSoup
 
 from app.celery_app import celery_app
 
 SHORTS_DURATION = "30-60초"
 LONGFORM_DURATION = "5-15분"
+SQUARE_DURATION = "30-90초"
 SHORTS_SCENES = "3-5"
 LONGFORM_SCENES = "15-25"
+SQUARE_SCENES = "3-7"
 
 
 TONE_MAP = {
@@ -291,9 +296,18 @@ def build_script_prompt(
     language: str = "ko",
     script_config: dict | None = None,
 ) -> str:
-    is_shorts = video_type == "shorts"
-    duration = SHORTS_DURATION if is_shorts else LONGFORM_DURATION
-    scene_count = SHORTS_SCENES if is_shorts else LONGFORM_SCENES
+    DURATION_MAP = {
+        "shorts": SHORTS_DURATION,
+        "long": LONGFORM_DURATION,
+        "square": SQUARE_DURATION,
+    }
+    SCENE_COUNT_MAP = {
+        "shorts": SHORTS_SCENES,
+        "long": LONGFORM_SCENES,
+        "square": SQUARE_SCENES,
+    }
+    duration = DURATION_MAP.get(video_type, LONGFORM_DURATION)
+    scene_count = SCENE_COUNT_MAP.get(video_type, LONGFORM_SCENES)
     cfg = script_config or {}
     lang = _get_lang(language)
     labels = LANG_LABELS.get(lang, LANG_LABELS[DEFAULT_LANGUAGE])
@@ -450,6 +464,119 @@ def extract_text_from_response(provider: str, response_json: dict) -> str:
 
 
 API_TIMEOUT_SECONDS = 60.0
+URL_FETCH_TIMEOUT = 30.0
+MAX_ARTICLE_CHARS = 8000
+
+_HTML_NOISE_TAGS = {"script", "style", "nav", "footer", "header", "aside", "iframe"}
+
+
+def fetch_article_text(url: str) -> str:
+    """Fetch and extract main text content from a URL.
+
+    Strips HTML tags, navigation, scripts, and other noise.
+    Returns plain text limited to MAX_ARTICLE_CHARS.
+    """
+    response = httpx.get(
+        url,
+        timeout=URL_FETCH_TIMEOUT,
+        follow_redirects=True,
+        headers={"User-Agent": "AutoTube/1.0 (article-to-video)"},
+    )
+    response.raise_for_status()
+
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    for tag in soup.find_all(_HTML_NOISE_TAGS):
+        tag.decompose()
+
+    # article 태그 우선, 없으면 body 전체
+    article = soup.find("article") or soup.find("main") or soup.body or soup
+    text = article.get_text(separator="\n", strip=True)
+
+    # 빈 줄 정리
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    return text[:MAX_ARTICLE_CHARS]
+
+
+def build_url_script_prompt(
+    article_text: str,
+    video_type: str,
+    language: str = "ko",
+    script_config: dict | None = None,
+) -> str:
+    """Build a prompt that converts article text into a video script."""
+    DURATION_MAP = {
+        "shorts": SHORTS_DURATION,
+        "long": LONGFORM_DURATION,
+        "square": SQUARE_DURATION,
+    }
+    SCENE_COUNT_MAP = {
+        "shorts": SHORTS_SCENES,
+        "long": LONGFORM_SCENES,
+        "square": SQUARE_SCENES,
+    }
+    duration = DURATION_MAP.get(video_type, LONGFORM_DURATION)
+    scene_count = SCENE_COUNT_MAP.get(video_type, LONGFORM_SCENES)
+    cfg = script_config or {}
+    lang = _get_lang(language)
+    labels = LANG_LABELS.get(lang, LANG_LABELS[DEFAULT_LANGUAGE])
+
+    extra_section = _build_extra_instructions(cfg, lang, labels)
+
+    url_templates = {
+        "ko": (
+            "아래 기사/글을 {video_type} 영상 대본으로 변환해주세요.\n\n"
+            "원문 내용:\n---\n{article_text}\n---\n\n"
+            "영상 길이: {duration}\n"
+            "장면 수: {scene_count}개\n"
+            "언어: {language}\n\n"
+            "각 장면 형식:\n"
+            "[장면 N]: 시각적 설명\n"
+            "나레이션: 나레이션 텍스트\n"
+            "이미지프롬프트: (영어로) Stable Diffusion에 최적화된 시각 프롬프트\n\n"
+            "{extra_section}"
+            "원문의 핵심 내용을 유지하되, 영상에 맞게 재구성하세요. "
+            "자연스러운 흐름과 시각적 설명을 포함해주세요."
+        ),
+        "en": (
+            "Convert the article/text below into a {video_type} video script.\n\n"
+            "Source content:\n---\n{article_text}\n---\n\n"
+            "Video duration: {duration}\n"
+            "Number of scenes: {scene_count}\n"
+            "Language: {language}\n\n"
+            "Format per scene:\n"
+            "Scene N: Visual description\n"
+            "Narration: Narration text\n"
+            "ImagePrompt: (in English) Visual prompt optimized for Stable Diffusion\n\n"
+            "{extra_section}"
+            "Keep the core content but restructure for video format. "
+            "Include natural flow and visual descriptions."
+        ),
+        "ja": (
+            "以下の記事/テキストを{video_type}動画の台本に変換してください。\n\n"
+            "原文:\n---\n{article_text}\n---\n\n"
+            "動画の長さ: {duration}\n"
+            "シーン数: {scene_count}\n"
+            "言語: {language}\n\n"
+            "各シーンの形式:\n"
+            "[シーン N]: 視覚的説明\n"
+            "ナレーション: ナレーションテキスト\n"
+            "画像プロンプト: (英語で) Stable Diffusion最適化ビジュアルプロンプト\n\n"
+            "{extra_section}"
+            "原文の核心内容を保ちつつ、動画に適した構成にしてください。"
+        ),
+    }
+
+    template = url_templates.get(lang, url_templates[DEFAULT_LANGUAGE])
+    return template.format(
+        video_type=video_type,
+        article_text=article_text,
+        duration=duration,
+        scene_count=scene_count,
+        language=language,
+        extra_section=extra_section,
+    )
 
 
 @celery_app.task(name="pipeline.generate_script")
@@ -469,7 +596,20 @@ def generate_script_task(
         manual_text = cfg.get("manual_script", "")
         return parse_script_response(manual_text)
 
-    prompt = build_script_prompt(topic, video_type, language, script_config=cfg)
+    # url 모드: URL에서 기사를 가져와서 대본으로 변환
+    if cfg.get("mode") == "url":
+        source_url = cfg.get("source_url", "").strip()
+        if not source_url:
+            raise ValueError(
+                "URL 모드에서는 source_url이 필요합니다. "
+                "script_config에 source_url을 포함해주세요."
+            )
+        article_text = fetch_article_text(source_url)
+        prompt = build_url_script_prompt(
+            article_text, video_type, language, script_config=cfg,
+        )
+    else:
+        prompt = build_script_prompt(topic, video_type, language, script_config=cfg)
     request = build_api_request(prompt, api_provider, api_key)
 
     response = httpx.post(
