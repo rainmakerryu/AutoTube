@@ -43,6 +43,9 @@ const STEP_PROVIDERS: Record<string, ProviderOption[]> = {
   audio_post: [
     { id: "local", name: "로컬 후처리 (무료)", models: ["pydub+ffmpeg"], free: true },
   ],
+  video_gen: [
+    { id: "comfyui", name: "ComfyUI (로컬)", models: ["AnimateDiff", "SVD", "Wan2.1", "CogVideoX"], free: true },
+  ],
   video: [],
   subtitle: [
     { id: "openai", name: "Whisper", models: ["whisper-1"] },
@@ -70,6 +73,9 @@ const STEP_PROVIDERS: Record<string, ProviderOption[]> = {
   sns: [
     { id: "manual", name: "직접 배포 (무료)", models: ["share-text"], free: true },
   ],
+  youtube_upload: [
+    { id: "youtube", name: "YouTube API", models: ["upload-v3"], free: true },
+  ],
 };
 
 const STEP_LABELS: Record<string, string> = {
@@ -77,6 +83,7 @@ const STEP_LABELS: Record<string, string> = {
   tts: "음성 생성 (TTS)",
   audio_post: "오디오 후처리",
   images: "이미지 생성",
+  video_gen: "AI 영상 생성",
   video: "영상 합성",
   subtitle: "자막 생성",
   metadata: "메타데이터 생성",
@@ -84,6 +91,7 @@ const STEP_LABELS: Record<string, string> = {
   bgm: "배경 음악 (BGM)",
   seo: "SEO 최적화",
   sns: "SNS 배포",
+  youtube_upload: "YouTube 업로드",
 };
 
 interface StepConfigPanelProps {

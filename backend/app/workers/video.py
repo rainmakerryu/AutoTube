@@ -19,6 +19,7 @@ from app.services.storage import (
 
 SHORTS_RESOLUTION = (1080, 1920)
 LONGFORM_RESOLUTION = (1920, 1080)
+SQUARE_RESOLUTION = (1080, 1080)
 DEFAULT_FPS = 30
 DEFAULT_IMAGE_DURATION_SECONDS = 5.0
 MIN_IMAGE_DURATION_SECONDS = 2.0
@@ -63,10 +64,10 @@ def validate_inputs(
                 f"지원 형식: {', '.join(sorted(SUPPORTED_AUDIO_FORMATS))}"
             )
 
-    if video_type not in ("shorts", "longform"):
+    if video_type not in ("shorts", "longform", "square"):
         errors.append(
             f"지원하지 않는 video_type입니다: '{video_type}'. "
-            "'shorts' 또는 'longform'을 사용하세요."
+            "'shorts', 'longform' 또는 'square'를 사용하세요."
         )
 
     return errors
@@ -78,9 +79,11 @@ def get_resolution(video_type: str) -> tuple[int, int]:
         return SHORTS_RESOLUTION
     elif video_type == "longform":
         return LONGFORM_RESOLUTION
+    elif video_type == "square":
+        return SQUARE_RESOLUTION
     raise ValueError(
         f"지원하지 않는 video_type입니다: '{video_type}'. "
-        "'shorts' 또는 'longform'을 사용하세요."
+        "'shorts', 'longform' 또는 'square'를 사용하세요."
     )
 
 
@@ -277,15 +280,19 @@ def compose_video_task(
     video_type: str = "shorts",
     sync_mode: str = "normal",
     speed_factor: float = 1.0,
+    video_clip_urls: list[str] | None = None,
     intro_video_url: str | None = None,
     logo_url: str | None = None,
     logo_position: str = "top-right",
     logo_opacity: float = 0.8,
 ) -> dict:
-    """이미지와 오디오로 실제 영상을 합성한다.
+    """이미지/영상클립과 오디오로 실제 영상을 합성한다.
 
-    1. 이미지 다운로드/디코딩 + resize
-    2. moviepy ImageClip + Ken Burns 효과
+    video_clip_urls가 있으면 영상 클립 모드 (VideoFileClip 사용),
+    없으면 기존 이미지 모드 (ImageClip + Ken Burns 효과).
+
+    1. 이미지/영상클립 다운로드/디코딩 + resize
+    2. moviepy ImageClip/VideoFileClip
     3. crossfade 전환으로 concat
     4. 오디오 합성
     5. R2 업로드
@@ -293,26 +300,26 @@ def compose_video_task(
     from moviepy import ImageClip, AudioFileClip, concatenate_videoclips
 
     resolution = get_resolution(video_type)
+    use_video_clips = bool(video_clip_urls)
 
-    # None 필터링
-    valid_images = [url for url in image_urls if url is not None]
-    scene_count = len(valid_images)
+    if use_video_clips:
+        scene_count = len(video_clip_urls)
+        if scene_count == 0:
+            raise ValueError(
+                "유효한 영상 클립이 없습니다. 영상 생성 단계를 다시 실행하세요."
+            )
+    else:
+        # None 필터링
+        valid_images = [url for url in image_urls if url is not None]
+        scene_count = len(valid_images)
 
-    if scene_count == 0:
-        raise ValueError(
-            "유효한 이미지가 없습니다. 이미지 생성 단계를 다시 실행하세요."
-        )
+        if scene_count == 0:
+            raise ValueError(
+                "유효한 이미지가 없습니다. 이미지 생성 단계를 다시 실행하세요."
+            )
 
     work_dir = tempfile.mkdtemp(prefix="autotube_video_")
     try:
-        # 1. 이미지 다운로드 + resize
-        image_paths: list[str] = []
-        for i, img_data in enumerate(valid_images):
-            img_bytes = _decode_image(img_data)
-            img_path = os.path.join(work_dir, f"scene_{i:03d}.png")
-            _prepare_image(img_bytes, resolution, img_path)
-            image_paths.append(img_path)
-
         # 2. 오디오 다운로드 (있으면)
         audio_path = None
         audio_duration = None
@@ -334,14 +341,46 @@ def compose_video_task(
 
         # 4. 장면 clips 생성
         clips = []
-        for i, (img_path, duration) in enumerate(zip(image_paths, scene_durations)):
-            clip = ImageClip(img_path).with_duration(duration).with_fps(DEFAULT_FPS)
 
-            # Ken Burns 효과
-            kb_params = build_ken_burns_params(i, scene_count)
-            clip = _apply_ken_burns(clip, kb_params, resolution)
+        if use_video_clips:
+            # --- 영상 클립 모드: VideoFileClip 사용 ---
+            from moviepy import VideoFileClip
 
-            clips.append(clip)
+            for i, clip_url in enumerate(video_clip_urls):
+                clip_path = os.path.join(work_dir, f"clip_{i:03d}.mp4")
+                _download_file(clip_url, clip_path)
+                vclip = VideoFileClip(clip_path)
+
+                # 장면 duration에 맞게 속도 조정
+                target_duration = scene_durations[i] if i < len(scene_durations) else vclip.duration
+                if abs(vclip.duration - target_duration) > 0.1 and vclip.duration > 0:
+                    speed_ratio = vclip.duration / target_duration
+                    vclip = vclip.with_speed_scaled(speed_ratio)
+
+                # 해상도에 맞게 리사이즈
+                if (vclip.w, vclip.h) != resolution:
+                    vclip = vclip.resized(resolution)
+
+                vclip = vclip.with_fps(DEFAULT_FPS)
+                clips.append(vclip)
+        else:
+            # --- 기존 이미지 모드: ImageClip + Ken Burns ---
+            # 1. 이미지 다운로드 + resize
+            image_paths: list[str] = []
+            for i, img_data in enumerate(valid_images):
+                img_bytes = _decode_image(img_data)
+                img_path = os.path.join(work_dir, f"scene_{i:03d}.png")
+                _prepare_image(img_bytes, resolution, img_path)
+                image_paths.append(img_path)
+
+            for i, (img_path, duration) in enumerate(zip(image_paths, scene_durations)):
+                clip = ImageClip(img_path).with_duration(duration).with_fps(DEFAULT_FPS)
+
+                # Ken Burns 효과
+                kb_params = build_ken_burns_params(i, scene_count)
+                clip = _apply_ken_burns(clip, kb_params, resolution)
+
+                clips.append(clip)
 
         # 5. Crossfade concat (moviepy v2: crossfadein 제거됨, CompositeVideoClip 사용)
         if len(clips) > 1:

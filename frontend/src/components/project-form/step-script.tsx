@@ -33,6 +33,7 @@ const EMOTION_TAGS = [
 const TABS: { mode: ScriptMode; label: string }[] = [
   { mode: "basic", label: "기본 설정" },
   { mode: "ai", label: "AI로 작성하기" },
+  { mode: "url", label: "URL로 만들기" },
   { mode: "manual", label: "직접 입력하기" },
 ];
 
@@ -242,6 +243,76 @@ function AITab({
   );
 }
 
+function URLTab({
+  formData,
+  onChange,
+}: {
+  formData: FormData;
+  onChange: (data: Partial<FormData>) => void;
+}) {
+  const s = formData.script;
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-zinc-500">
+        웹 기사나 블로그 URL을 입력하면 AI가 내용을 분석하여 영상 대본을
+        자동으로 생성합니다.
+      </p>
+      <div className="space-y-2">
+        <Label htmlFor="url-title">제목</Label>
+        <Input
+          id="url-title"
+          placeholder="내 영상 제목"
+          value={s.title}
+          onChange={(e) =>
+            updateScript(formData, onChange, { title: e.target.value })
+          }
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="source-url">기사/블로그 URL</Label>
+        <Input
+          id="source-url"
+          type="url"
+          placeholder="https://example.com/article/..."
+          value={s.sourceUrl}
+          onChange={(e) =>
+            updateScript(formData, onChange, { sourceUrl: e.target.value })
+          }
+        />
+        <p className="text-xs text-zinc-500">
+          기사, 블로그, 뉴스 등의 URL을 입력하세요. AI가 내용을 추출하여 영상
+          대본으로 변환합니다.
+        </p>
+      </div>
+
+      {/* 기본 설정 (언어, 톤 등) */}
+      <div className="space-y-4 rounded-lg border border-zinc-800 bg-zinc-950/50 p-4">
+        <h4 className="text-xs font-semibold text-zinc-400">대본 스타일</h4>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label className="text-xs text-zinc-500">대본 언어</Label>
+            <ChipGroup
+              options={LANGUAGES}
+              value={s.language}
+              onSelect={(v) =>
+                updateScript(formData, onChange, { language: v })
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-zinc-500">톤</Label>
+            <ChipGroup
+              options={TONES}
+              value={s.tone}
+              onSelect={(v) => updateScript(formData, onChange, { tone: v })}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ManualTab({
   formData,
   onChange,
@@ -415,6 +486,9 @@ export function StepScript({ formData, onChange }: StepScriptProps) {
       )}
       {currentMode === "ai" && (
         <AITab formData={formData} onChange={onChange} />
+      )}
+      {currentMode === "url" && (
+        <URLTab formData={formData} onChange={onChange} />
       )}
       {currentMode === "manual" && (
         <ManualTab formData={formData} onChange={onChange} />

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import tempfile
+
 import httpx
 
 from app.celery_app import celery_app
@@ -8,8 +11,11 @@ from app.services.storage import build_storage_key, save_local, save_to_output_d
 WHISPER_API_URL = "https://api.openai.com/v1/audio/transcriptions"
 WHISPER_MODEL = "whisper-1"
 API_TIMEOUT_SECONDS = 120.0
+DOWNLOAD_TIMEOUT_SECONDS = 60.0
 MAX_SUBTITLE_LINE_LENGTH = 42
 DEFAULT_LANGUAGE = "ko"
+BURNIN_OUTPUT_FILENAME = "output.mp4"
+BURNIN_CONTENT_TYPE = "video/mp4"
 
 
 def format_srt_timestamp(seconds: float) -> str:
@@ -210,6 +216,107 @@ def segments_to_ass(
     return header + "\n".join(events) + "\n"
 
 
+# moviepy TextClip에서 사용할 색상 매핑 (ASS 프리셋 → CSS 색상)
+BURNIN_STYLE_COLORS: dict[str, dict] = {
+    "youtube": {"color": "white", "stroke_color": "black", "stroke_width": 0},
+    "yellow_bold": {"color": "yellow", "stroke_color": "black", "stroke_width": 2},
+    "white_outline": {"color": "white", "stroke_color": "black", "stroke_width": 3},
+    "neon_green": {"color": "#39FF14", "stroke_color": "black", "stroke_width": 2},
+    "cinema": {"color": "white", "stroke_color": "black", "stroke_width": 0},
+}
+
+
+def _build_burnin_style(config: dict, style_id: str) -> dict:
+    """자막 번인용 스타일 설정을 빌드."""
+    colors = BURNIN_STYLE_COLORS.get(style_id, BURNIN_STYLE_COLORS["youtube"])
+    return {
+        "font_size": config.get("font_size", 36),
+        "color": colors["color"],
+        "stroke_color": colors["stroke_color"],
+        "stroke_width": colors.get("stroke_width", 2),
+        "position": config.get("position", "bottom"),
+    }
+
+
+def _download_file(url: str) -> bytes:
+    """URL에서 파일을 다운로드."""
+    response = httpx.get(url, timeout=DOWNLOAD_TIMEOUT_SECONDS, follow_redirects=True)
+    response.raise_for_status()
+    return response.content
+
+
+def _burn_subtitles_moviepy(video_path: str, segments: list[dict], style_cfg: dict) -> str:
+    """moviepy TextClip으로 자막을 영상에 번인. 결과 파일 경로 반환."""
+    from moviepy import VideoFileClip, TextClip, CompositeVideoClip
+
+    output_path = os.path.join(tempfile.mkdtemp(), BURNIN_OUTPUT_FILENAME)
+
+    video = VideoFileClip(video_path)
+    font_size = style_cfg.get("font_size", 36)
+    color = style_cfg.get("color", "white")
+    stroke_color = style_cfg.get("stroke_color", "black")
+    stroke_width = style_cfg.get("stroke_width", 2)
+    position = style_cfg.get("position", "bottom")
+
+    # 위치 매핑
+    pos_map = {
+        "bottom": ("center", video.h - 80),
+        "center": ("center", "center"),
+        "top": ("center", 40),
+    }
+    pos = pos_map.get(position, pos_map["bottom"])
+
+    text_clips = []
+    for seg in segments:
+        text = seg.get("text", "").strip()
+        if not text:
+            continue
+        start = seg["start"]
+        end = seg["end"]
+        duration = end - start
+        if duration <= 0:
+            continue
+
+        tc = TextClip(
+            text=text,
+            font_size=font_size,
+            color=color,
+            stroke_color=stroke_color,
+            stroke_width=stroke_width,
+            font="Arial",
+            method="caption",
+            size=(video.w - 40, None),
+        )
+        tc = tc.with_position(pos).with_start(start).with_duration(duration)
+        text_clips.append(tc)
+
+    if text_clips:
+        final = CompositeVideoClip([video] + text_clips)
+    else:
+        final = video
+
+    final.write_videofile(
+        output_path,
+        codec="libx264",
+        audio_codec="aac",
+        logger=None,
+    )
+    video.close()
+    for tc in text_clips:
+        tc.close()
+
+    return output_path
+
+
+def _save_burnin_video(project_id: int, video_data: bytes) -> str:
+    """자막이 번인된 영상을 저장하고 URL 반환."""
+    key = build_storage_key(project_id, "subtitle", BURNIN_OUTPUT_FILENAME)
+    url = save_local(key, video_data)
+    # 최종 출력 디렉토리에도 output.mp4로 저장 (덮어쓰기)
+    save_to_output_dir(project_id, BURNIN_OUTPUT_FILENAME, video_data)
+    return url
+
+
 def _save_subtitle(project_id: int, content: str, filename: str) -> str | None:
     """자막 파일을 로컬 media + 사용자 출력 디렉토리에 저장하고 서빙 URL을 반환."""
     content_bytes = content.encode("utf-8")
@@ -253,6 +360,27 @@ def generate_script_based_subtitles(scenes: list[dict]) -> list[dict]:
     return segments
 
 
+def _burnin_subtitle_to_video(
+    project_id: int,
+    video_url: str,
+    segments: list[dict],
+    style_cfg: dict,
+) -> str | None:
+    """영상을 다운로드하고 자막을 번인한 뒤 업로드. URL 반환."""
+    video_data = _download_file(video_url)
+    video_tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+    video_tmp.write(video_data)
+    video_tmp.close()
+
+    try:
+        output_path = _burn_subtitles_moviepy(video_tmp.name, segments, style_cfg)
+        with open(output_path, "rb") as f:
+            result_data = f.read()
+        return _save_burnin_video(project_id, result_data)
+    finally:
+        os.unlink(video_tmp.name)
+
+
 @celery_app.task(name="pipeline.generate_subtitles")
 def generate_subtitles_task(
     project_id: int,
@@ -261,12 +389,14 @@ def generate_subtitles_task(
     language: str = "ko",
     scenes: list[dict] | None = None,
     subtitle_config: dict | None = None,
+    video_url: str | None = None,
 ) -> dict:
-    """Generate subtitles in SRT or ASS format.
+    """Generate subtitles and burn them into the video.
 
     If subtitle_config is provided with a style, generates ASS format.
     If scenes are provided and no api_key, generates from script text.
     Otherwise uses Whisper API for speech-to-text.
+    After generating subtitles, burns them into the video using ffmpeg.
     """
     config = subtitle_config or {}
     style_id = config.get("style", "")
@@ -322,7 +452,8 @@ def generate_subtitles_task(
         # SRT도 함께 저장 (호환성)
         srt_content = segments_to_srt(segments)
         _save_subtitle(project_id, srt_content, SRT_FILENAME)
-        return {
+
+        result = {
             "srt_content": srt_content,
             "ass_content": ass_content,
             "subtitle_url": subtitle_url,
@@ -332,13 +463,39 @@ def generate_subtitles_task(
             "style": style_id,
         }
 
-    # SRT 포맷 (기본)
+        # 영상에 자막 번인
+        if video_url:
+            burnin_style = _build_burnin_style(config, style_id)
+            burnin_url = _burnin_subtitle_to_video(
+                project_id, video_url, segments, burnin_style
+            )
+            if burnin_url:
+                result["video_url"] = burnin_url
+
+        return result
+
+    # SRT 포맷 (기본) — 기본 스타일로 번인
     srt_content = segments_to_srt(segments)
     subtitle_url = _save_subtitle(project_id, srt_content, SRT_FILENAME)
-    return {
+
+    result = {
         "srt_content": srt_content,
         "subtitle_url": subtitle_url,
         "segment_count": len(segments),
         "provider": provider,
         "format": "srt",
     }
+
+    # SRT인 경우에도 기본 스타일로 번인
+    if video_url:
+        # ASS 파일도 저장 (호환성)
+        ass_for_save = segments_to_ass(segments)
+        _save_subtitle(project_id, ass_for_save, ASS_FILENAME)
+        burnin_style = _build_burnin_style(config, "youtube")
+        burnin_url = _burnin_subtitle_to_video(
+            project_id, video_url, segments, burnin_style
+        )
+        if burnin_url:
+            result["video_url"] = burnin_url
+
+    return result

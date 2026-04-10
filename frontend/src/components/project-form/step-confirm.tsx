@@ -5,6 +5,8 @@ import {
   VIDEO_TYPES,
   IMAGE_PROVIDERS,
   IMAGE_STYLES,
+  VIDEO_GEN_MODES,
+  VIDEO_GEN_MODELS,
   VOICE_OPTIONS,
   EMOTIONS,
   LANGUAGES,
@@ -70,7 +72,9 @@ export function StepConfirm({ formData }: StepConfirmProps) {
       ? "기본 설정 (AI 자동)"
       : s.mode === "ai"
         ? "AI로 작성하기"
-        : "직접 입력";
+        : s.mode === "url"
+          ? "URL로 만들기"
+          : "직접 입력";
 
   return (
     <div className="space-y-6">
@@ -127,6 +131,20 @@ export function StepConfirm({ formData }: StepConfirmProps) {
             )}
           </>
         )}
+        {s.mode === "url" && s.sourceUrl && (
+          <>
+            <Row
+              label="URL"
+              value={
+                <span className="max-w-[260px] truncate inline-block">
+                  {s.sourceUrl}
+                </span>
+              }
+            />
+            <Row label="언어" value={findLabel(LANGUAGES, s.language)} />
+            <Row label="톤" value={findLabel(TONES, s.tone)} />
+          </>
+        )}
         {s.mode === "manual" && s.manualScript && (
           <Row
             label="대본"
@@ -159,6 +177,18 @@ export function StepConfirm({ formData }: StepConfirmProps) {
           }
         />
         <Row label="스타일" value={imageStyle?.name ?? img.style} />
+        {img.videoGenMode !== "none" && (
+          <>
+            <Row
+              label="AI 영상"
+              value={findLabel(VIDEO_GEN_MODES, img.videoGenMode)}
+            />
+            <Row
+              label="모델"
+              value={findLabel(VIDEO_GEN_MODELS, img.videoGenModel)}
+            />
+          </>
+        )}
       </SummaryCard>
 
       {/* AI 보이스 */}

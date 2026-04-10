@@ -5,6 +5,7 @@ import {
   Mic,
   Image,
   Video,
+  Clapperboard,
   Subtitles,
   Check,
   Loader2,
@@ -15,6 +16,7 @@ import {
   Share2,
   SlidersHorizontal,
   ImagePlus,
+  Upload,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,13 +27,15 @@ const STEP_CONFIG: Record<string, { label: string; icon: React.ComponentType<{ c
   tts: { label: "TTS", icon: Mic },
   audio_post: { label: "오디오 후처리", icon: SlidersHorizontal },
   images: { label: "이미지", icon: Image },
-  video: { label: "영상", icon: Video },
+  video_gen: { label: "AI 영상 생성", icon: Clapperboard },
+  video: { label: "영상 합성", icon: Video },
   subtitle: { label: "자막", icon: Subtitles },
   metadata: { label: "메타데이터", icon: FileText },
   thumbnail: { label: "썸네일", icon: ImagePlus },
   bgm: { label: "BGM", icon: Music },
   seo: { label: "SEO", icon: Search },
   sns: { label: "SNS", icon: Share2 },
+  youtube_upload: { label: "YouTube 업로드", icon: Upload },
 };
 
 const STATUS_LABELS: Record<string, string> = {

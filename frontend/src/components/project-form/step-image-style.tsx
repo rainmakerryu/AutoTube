@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   IMAGE_PROVIDERS,
   IMAGE_STYLES,
+  VIDEO_GEN_MODES,
+  VIDEO_GEN_MODELS,
   type FormData,
   type ImageConfig,
 } from "./types";
@@ -97,6 +99,93 @@ export function StepImageStyle({ formData, onChange }: StepImageStyleProps) {
           })}
         </div>
       </div>
+
+      {/* AI Video Generation (ComfyUI only) */}
+      {img.provider === "comfyui" && (
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-medium text-zinc-300">
+              AI 영상 생성
+            </h3>
+            <p className="text-xs text-zinc-500">
+              ComfyUI를 사용하여 정적 이미지 대신 AI 영상 클립을 생성합니다.
+            </p>
+          </div>
+
+          {/* Mode selection */}
+          <div className="grid grid-cols-3 gap-3">
+            {VIDEO_GEN_MODES.map((mode) => {
+              const isSelected = img.videoGenMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() =>
+                    updateImage(formData, onChange, { videoGenMode: mode.id })
+                  }
+                  className={`rounded-lg border p-3 text-left transition-all ${
+                    isSelected
+                      ? "border-violet-500/60 bg-violet-950/30"
+                      : "border-zinc-800 bg-zinc-900/50 hover:border-zinc-700"
+                  }`}
+                >
+                  <div className="text-sm font-medium text-zinc-200">
+                    {mode.name}
+                  </div>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    {mode.description}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Model selection (when mode is not "none") */}
+          {img.videoGenMode !== "none" && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-medium text-zinc-400">영상 생성 모델</h4>
+              <div className="grid grid-cols-2 gap-3">
+                {VIDEO_GEN_MODELS.filter((m) =>
+                  (m.modes as readonly string[]).includes(img.videoGenMode),
+                ).map((model) => {
+                  const isSelected = img.videoGenModel === model.id;
+                  return (
+                    <button
+                      key={model.id}
+                      type="button"
+                      onClick={() =>
+                        updateImage(formData, onChange, {
+                          videoGenModel: model.id,
+                        })
+                      }
+                      className={`rounded-lg border p-3 text-left transition-all ${
+                        isSelected
+                          ? "border-violet-500/60 bg-violet-950/30"
+                          : "border-zinc-800 bg-zinc-900/50 hover:border-zinc-700"
+                      }`}
+                    >
+                      <div className="text-sm font-medium text-zinc-200">
+                        {model.name}
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        {model.description}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {img.videoGenMode === "txt2vid" && (
+                <div className="rounded-lg border border-amber-900/50 bg-amber-950/30 p-3">
+                  <p className="text-xs text-amber-300">
+                    텍스트에서 직접 영상을 생성합니다. 이미지 생성 단계는 건너뜁니다.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

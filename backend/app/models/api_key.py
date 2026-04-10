@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import String, DateTime, Boolean, ForeignKey, LargeBinary, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -16,7 +19,7 @@ class ApiKey(Base):
     nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     tag: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     is_valid: Mapped[bool] = mapped_column(Boolean, default=True)
-    last_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="api_keys")
